@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useMinLoading } from '../hooks/useMinLoading';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, ClipboardX } from 'lucide-react';
 import { getOrders } from '../lib/api';
@@ -21,7 +22,7 @@ const STATUS_OPTIONS = [
 
 export default function Orders() {
   const [orders, setOrders] = useState<OrderSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useMinLoading(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);

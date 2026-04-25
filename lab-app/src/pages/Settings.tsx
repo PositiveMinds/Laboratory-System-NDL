@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useMinLoading } from '../hooks/useMinLoading';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import {
@@ -29,7 +30,7 @@ export default function Settings() {
 
   // Users
   const [users, setUsers] = useState<UserInfo[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useMinLoading(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [userForm, setUserForm] = useState({ username: '', full_name: '', email: '', password: '', role: 'lab_tech' });
   const [userSaving, setUserSaving] = useState(false);
@@ -37,7 +38,7 @@ export default function Settings() {
   // Tests / Prices
   const [categories, setCategories] = useState<TestCategory[]>([]);
   const [tests, setTests] = useState<TestItem[]>([]);
-  const [loadingTests, setLoadingTests] = useState(false);
+  const [loadingTests, setLoadingTests] = useMinLoading(false);
   const [editPrices, setEditPrices] = useState<Record<number, string>>({});
   const [priceSaving, setPriceSaving] = useState<number | null>(null);
 
@@ -68,7 +69,7 @@ export default function Settings() {
   const [allTestsForRanges, setAllTestsForRanges] = useState<TestItem[]>([]);
   const [selectedRefTestId, setSelectedRefTestId] = useState<string>('');
   const [refRanges, setRefRanges] = useState<ReferenceRange[]>([]);
-  const [loadingRanges, setLoadingRanges] = useState(false);
+  const [loadingRanges, setLoadingRanges] = useMinLoading(false);
   const [showRangeModal, setShowRangeModal] = useState(false);
   const [editRange, setEditRange] = useState<ReferenceRange | null>(null);
   const [rangeForm, setRangeForm] = useState({ gender: '', age_min: '', age_max: '', unit: '', reference_range: '' });
@@ -81,7 +82,7 @@ export default function Settings() {
 
   // Audit Log
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [loadingAudit, setLoadingAudit] = useMinLoading(false);
 
   useEffect(() => {
     if (activeTab === 'users' && user?.role === 'admin') {

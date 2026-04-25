@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useMinLoading } from '../hooks/useMinLoading';
 import { flushSync } from 'react-dom';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { FlaskConical, Printer, CheckCheck, ExternalLink, Mail, TrendingUp, X } from 'lucide-react';
@@ -38,8 +39,8 @@ export default function Results() {
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<OrderDetail | null>(null);
   const [results, setResults] = useState<Record<number, ResultEntry>>({});
-  const [loadingOrders, setLoadingOrders] = useState(true);
-  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [loadingOrders, setLoadingOrders] = useMinLoading(true);
+  const [loadingDetail, setLoadingDetail] = useMinLoading(false);
   const [saving, setSaving] = useState(false);
   const [reportData, setReportData] = useState<ResultsReportData | null>(null);
   const [orderPage, setOrderPage] = useState(1);

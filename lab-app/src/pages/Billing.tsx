@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useMinLoading } from '../hooks/useMinLoading';
 import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -39,7 +40,7 @@ const PAY_METHOD_OPTIONS = [
 export default function Billing() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<OrderSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useMinLoading(true);
   const [payFilter, setPayFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');

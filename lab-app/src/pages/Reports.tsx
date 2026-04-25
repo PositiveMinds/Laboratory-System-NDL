@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useMinLoading } from '../hooks/useMinLoading';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Clock, BarChart2, DollarSign, FlaskConical } from 'lucide-react';
 import {
@@ -29,7 +30,7 @@ const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
 export default function Reports() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('pending');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useMinLoading(false);
   const [dateFrom, setDateFrom] = useState(monthAgo);
   const [dateTo, setDateTo] = useState(today);
   const [period, setPeriod] = useState('day');

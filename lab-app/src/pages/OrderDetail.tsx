@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useMinLoading } from '../hooks/useMinLoading';
 import { flushSync } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -48,7 +49,7 @@ export default function OrderDetailPage() {
 
   const [order, setOrder] = useState<OD | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useMinLoading(true);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [reportData, setReportData] = useState<ResultsReportData | null>(null);
   const [showLabel, setShowLabel] = useState(false);

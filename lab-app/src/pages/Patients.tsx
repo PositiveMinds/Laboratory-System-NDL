@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useMinLoading } from '../hooks/useMinLoading';
 import { Search, Plus, Loader2, UserX, Pencil } from 'lucide-react';
 import { getPatients, createPatient, updatePatient } from '../lib/api';
 import type { Patient, CreatePatientInput } from '../types';
@@ -22,7 +23,7 @@ const GENDER_OPTIONS = [
 export default function Patients() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useMinLoading(true);
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<Patient | null>(null);
   const [form, setForm] = useState<CreatePatientInput>(emptyForm());

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useMinLoading } from '../hooks/useMinLoading';
 import { useNavigate } from 'react-router-dom';
 import { Search, Check, Loader2, X } from 'lucide-react';
 import { getPatients, getTests, createOrder } from '../lib/api';
@@ -31,7 +32,7 @@ export default function NewOrder() {
   const [collectedAt, setCollectedAt] = useState('');
   const [patientSearch, setPatientSearch] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useMinLoading(true);
 
   useEffect(() => {
     Promise.all([getPatients(''), getTests()]).then(([ps, ts]) => {

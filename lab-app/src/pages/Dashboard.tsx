@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useMinLoading } from '../hooks/useMinLoading';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, ClipboardList, Clock, CheckCircle,
@@ -72,7 +73,7 @@ export default function Dashboard() {
   const [revenueData, setRevenueData] = useState<RevenueStat[]>([]);
   const [topTests, setTopTests] = useState<TopTest[]>([]);
   const [period, setPeriod] = useState<Period>('30d');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useMinLoading(true);
   const navigate = useNavigate();
 
   useEffect(() => {
