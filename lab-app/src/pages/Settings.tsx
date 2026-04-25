@@ -534,7 +534,12 @@ export default function Settings() {
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid var(--border-color)', paddingBottom: 0, flexWrap: 'wrap' }}>
         {TABS.map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+          <button key={tab.key} onClick={() => {
+            setActiveTab(tab.key);
+            if (tab.key === 'users') setLoadingUsers(true);
+            if (tab.key === 'tests') setLoadingTests(true);
+            if (tab.key === 'audit') setLoadingAudit(true);
+          }}
             style={{
               background: 'none', border: 'none', padding: '8px 18px',
               fontWeight: activeTab === tab.key ? 700 : 500,

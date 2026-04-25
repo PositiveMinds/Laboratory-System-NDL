@@ -40,7 +40,7 @@ export default function Reports() {
   const [financialData, setFinancialData] = useState<FinancialStat[]>([]);
   const [tatData, setTatData] = useState<TATItem[]>([]);
   const [criticalData, setCriticalData] = useState<CriticalItem[]>([]);
-  const [loaded, setLoaded] = useState<Tab | null>(null);
+  const [loadedTabs, setLoadedTabs] = useState<Set<Tab>>(new Set());
 
   const runReport = async () => {
     setLoading(true);
@@ -56,7 +56,7 @@ export default function Reports() {
       } else if (tab === 'critical') {
         setCriticalData(await getCriticalValuesReport(dateFrom, dateTo));
       }
-      setLoaded(tab);
+      setLoadedTabs(prev => new Set([...prev, tab]));
     } catch (err) {
       console.error(err);
     } finally {
@@ -138,7 +138,7 @@ export default function Reports() {
       <div className="card" style={{ padding: 0 }}>
         {loading ? (
           <PageLoader label="Generating report…" />
-        ) : loaded !== tab ? (
+        ) : !loadedTabs.has(tab) ? (
           <div className="empty-state" style={{ padding: 40 }}>
             <BarChart2 size={40} style={{ opacity: 0.2, marginBottom: 12 }} />
             <p>Click "Run Report" to generate data.</p>

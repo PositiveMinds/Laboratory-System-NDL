@@ -66,26 +66,39 @@ export default function Header() {
         </div>
         {open && (
           <div style={{
-            position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--bg-card)',
-            border: '1px solid var(--border-color)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-            zIndex: 1000, overflow: 'hidden', marginTop: 4,
+            position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 8,
+            boxShadow: '0 12px 32px rgba(0,0,0,0.22)',
+            zIndex: 9999,
+            overflow: 'hidden',
+            maxHeight: 380,
+            overflowY: 'auto',
           }}>
             {results.map((r, i) => (
               <div
                 key={i}
                 onClick={() => handleSelect(r)}
-                style={{ padding: '8px 14px', cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'center' }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
-                onMouseLeave={e => (e.currentTarget.style.background = '')}
+                style={{
+                  padding: '10px 14px', cursor: 'pointer', display: 'flex', gap: 10,
+                  alignItems: 'center', borderBottom: '1px solid var(--border-color)',
+                  background: 'var(--bg-secondary)',
+                  transition: 'background 0.1s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-primary)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-secondary)')}
               >
-                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5,
+                <span style={{
+                  fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5,
                   color: r.kind === 'patient' ? '#10b981' : 'var(--primary-color)',
                   background: r.kind === 'patient' ? 'rgba(16,185,129,0.12)' : 'rgba(245,73,39,0.1)',
-                  padding: '2px 6px', borderRadius: 4 }}>
+                  padding: '2px 6px', borderRadius: 4, flexShrink: 0,
+                }}>
                   {r.kind}
                 </span>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{r.title}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{r.subtitle}</div>
                 </div>
               </div>

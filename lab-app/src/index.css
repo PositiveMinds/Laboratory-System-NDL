@@ -89,6 +89,8 @@ button { cursor: pointer; font-family: inherit; }
   justify-content: space-between;
   padding: 0 24px;
   gap: 16px;
+  position: relative;
+  z-index: 200;
 }
 
 .page-content {
