@@ -21,6 +21,9 @@ pub struct SessionUser {
     pub username: String,
     pub full_name: String,
     pub role: String,
+    pub phone: Option<String>,
+    pub title: Option<String>,
+    pub email: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -221,6 +224,8 @@ pub struct UserInfo {
     pub full_name: String,
     pub role: String,
     pub email: Option<String>,
+    pub phone: Option<String>,
+    pub title: Option<String>,
     pub failed_attempts: i64,
     pub locked_until: Option<String>,
     pub created_at: String,
@@ -516,6 +521,8 @@ fn init_db(conn: &Connection) -> rusqlite::Result<()> {
     let _ = conn.execute("ALTER TABLE users ADD COLUMN email TEXT", []);
     let _ = conn.execute("ALTER TABLE users ADD COLUMN failed_attempts INTEGER DEFAULT 0", []);
     let _ = conn.execute("ALTER TABLE users ADD COLUMN locked_until TEXT", []);
+    let _ = conn.execute("ALTER TABLE users ADD COLUMN phone TEXT", []);
+    let _ = conn.execute("ALTER TABLE users ADD COLUMN title TEXT", []);
     let _ = conn.execute("ALTER TABLE test_orders ADD COLUMN discount_amount REAL NOT NULL DEFAULT 0.0", []);
     let _ = conn.execute("ALTER TABLE test_orders ADD COLUMN discount_reason TEXT", []);
     let _ = conn.execute("ALTER TABLE test_orders ADD COLUMN referred_by TEXT", []);
@@ -788,15 +795,17 @@ pub mod commands {
         let db = state.db.lock().map_err(|_| "DB lock error".to_string())?;
         db.execute_batch("PRAGMA foreign_keys = ON;").ok();
         let row = db.query_row(
-            "SELECT id, username, full_name, password_hash, role, COALESCE(failed_attempts,0), locked_until FROM users WHERE username = ?1",
+            "SELECT id, username, full_name, password_hash, role, COALESCE(failed_attempts,0), locked_until, phone, title, email FROM users WHERE username = ?1",
             params![username],
             |r| Ok((r.get::<_,i64>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?,
                      r.get::<_,String>(3)?, r.get::<_,String>(4)?,
-                     r.get::<_,i64>(5)?, r.get::<_,Option<String>>(6)?)),
+                     r.get::<_,i64>(5)?, r.get::<_,Option<String>>(6)?,
+                     r.get::<_,Option<String>>(7)?, r.get::<_,Option<String>>(8)?,
+                     r.get::<_,Option<String>>(9)?)),
         ).optional().map_err(|e| e.to_string())?;
         match row {
             None => Err("Invalid username or password".to_string()),
-            Some((id, uname, full_name, hash_str, role, failed_attempts, locked_until)) => {
+            Some((id, uname, full_name, hash_str, role, failed_attempts, locked_until, phone, title, email)) => {
                 let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
                 if let Some(ref until) = locked_until {
                     if now < *until {
@@ -805,7 +814,7 @@ pub mod commands {
                 }
                 if verify(&password, &hash_str).map_err(|e| e.to_string())? {
                     db.execute("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?1", params![id]).ok();
-                    let user = SessionUser { id, username: uname.clone(), full_name: full_name.clone(), role: role.clone() };
+                    let user = SessionUser { id, username: uname.clone(), full_name: full_name.clone(), role: role.clone(), phone, title, email };
                     log_action(&db, id, &full_name, "login", Some("user"), Some(id), None);
                     *state.session.lock().map_err(|_| "Lock error".to_string())? = Some(user.clone());
                     Ok(user)
@@ -861,6 +870,29 @@ pub mod commands {
         Ok(())
     }
 
+    #[tauri::command]
+    pub fn update_profile(full_name: String, phone: Option<String>, title: Option<String>, email: Option<String>, state: State<AppState>) -> Result<SessionUser, String> {
+        let user = require_session(&state.session)?;
+        if full_name.trim().is_empty() { return Err("Full name is required".to_string()); }
+        let db = state.db.lock().map_err(|_| "DB lock error".to_string())?;
+        db.execute(
+            "UPDATE users SET full_name = ?1, phone = ?2, title = ?3, email = ?4 WHERE id = ?5",
+            params![full_name.trim(), phone.as_deref().filter(|s| !s.is_empty()), title.as_deref().filter(|s| !s.is_empty()), email.as_deref().filter(|s| !s.is_empty()), user.id],
+        ).map_err(|e| e.to_string())?;
+        let updated = SessionUser {
+            id: user.id,
+            username: user.username.clone(),
+            full_name: full_name.trim().to_string(),
+            role: user.role.clone(),
+            phone: phone.filter(|s| !s.is_empty()),
+            title: title.filter(|s| !s.is_empty()),
+            email: email.filter(|s| !s.is_empty()),
+        };
+        *state.session.lock().map_err(|_| "Lock error".to_string())? = Some(updated.clone());
+        log_action(&db, user.id, &updated.full_name, "update_profile", Some("user"), Some(user.id), None);
+        Ok(updated)
+    }
+
     // Users
     #[tauri::command]
     pub fn get_users(state: State<AppState>) -> Result<Vec<UserInfo>, String> {
@@ -868,12 +900,13 @@ pub mod commands {
         if user.role != "admin" { return Err("Unauthorized".to_string()); }
         let db = state.db.lock().map_err(|_| "DB lock error".to_string())?;
         let mut stmt = db.prepare(
-            "SELECT id, username, full_name, role, email, COALESCE(failed_attempts,0), locked_until, created_at FROM users ORDER BY created_at"
+            "SELECT id, username, full_name, role, email, COALESCE(failed_attempts,0), locked_until, created_at, phone, title FROM users ORDER BY created_at"
         ).map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |r| Ok(UserInfo {
             id: r.get(0)?, username: r.get(1)?, full_name: r.get(2)?,
             role: r.get(3)?, email: r.get(4)?, failed_attempts: r.get(5)?,
             locked_until: r.get(6)?, created_at: r.get(7)?,
+            phone: r.get(8)?, title: r.get(9)?,
         })).map_err(|e| e.to_string())?;
         rows.collect::<rusqlite::Result<Vec<_>>>().map_err(|e| e.to_string())
     }
@@ -894,7 +927,7 @@ pub mod commands {
             .map_err(|e| e.to_string())?;
         log_action(&db, user.id, &user.full_name, "create_user", Some("user"), Some(id), Some(&input.username));
         Ok(UserInfo { id, username: input.username, full_name: input.full_name, role: input.role,
-            email: input.email, failed_attempts: 0, locked_until: None, created_at })
+            email: input.email, phone: None, title: None, failed_attempts: 0, locked_until: None, created_at })
     }
 
     #[tauri::command]
@@ -1924,7 +1957,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::login, commands::logout, commands::get_current_user, commands::change_password,
+            commands::login, commands::logout, commands::get_current_user, commands::change_password, commands::update_profile,
             commands::get_users, commands::create_user, commands::delete_user,
             commands::unlock_user, commands::update_user_email,
             commands::request_password_reset, commands::reset_password,

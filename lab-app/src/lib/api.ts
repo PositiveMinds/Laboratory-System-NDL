@@ -19,6 +19,9 @@ export const getCurrentUser = () => invoke<SessionUser | null>('get_current_user
 export const changePassword = (oldPassword: string, newPassword: string) =>
   invoke<void>('change_password', { oldPassword, newPassword });
 
+export const updateProfile = (fullName: string, phone?: string, title?: string, email?: string) =>
+  invoke<SessionUser>('update_profile', { fullName, phone, title, email });
+
 // ─── Users ─────────────────────────────────────────────────────────────────
 export const getUsers = () => invoke<UserInfo[]>('get_users');
 

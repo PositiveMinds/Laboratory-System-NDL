@@ -8,8 +8,11 @@ import {
 } from '../lib/api';
 import type { PendingOrder, WorkloadStat, FinancialStat, TATItem, CriticalItem } from '../types';
 import PageLoader from '../components/PageLoader';
+import Pagination from '../components/Pagination';
 import EZSelect from '../components/EZSelect';
 import EZDatePicker from '../components/EZDatePicker';
+
+const RPT_PAGE_SIZE = 10;
 
 const fmtDate = (s: string) => new Date(s).toLocaleDateString();
 const fmtNum = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -156,59 +159,70 @@ export default function Reports() {
 }
 
 function PendingTable({ data, onNavigate }: { data: PendingOrder[]; onNavigate: (id: number) => void }) {
+  const [page, setPage] = useState(1);
   if (!data.length) return <div className="empty-state" style={{ padding: 32 }}><p>No pending orders found.</p></div>;
+  const rows = data.slice((page - 1) * RPT_PAGE_SIZE, page * RPT_PAGE_SIZE);
   return (
-    <table className="data-table">
-      <thead><tr>
-        <th>Order #</th><th>Patient</th><th>Date</th><th>Days Pending</th><th>Progress</th>
-      </tr></thead>
-      <tbody>
-        {data.map(r => (
-          <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => onNavigate(r.id)}>
-            <td><span className="font-mono" style={{ color: 'var(--primary-color)' }}>{r.order_number}</span></td>
-            <td><strong>{r.patient_name}</strong><br /><small style={{ color: 'var(--text-secondary)' }}>{r.patient_ref}</small></td>
-            <td>{fmtDate(r.order_date)}</td>
-            <td>
-              <span style={{ fontWeight: 700, color: r.days_pending > 3 ? '#ef4444' : r.days_pending > 1 ? '#f59e0b' : '#10b981' }}>
-                {r.days_pending}d
-              </span>
-            </td>
-            <td>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ flex: 1, height: 6, background: 'var(--border-color)', borderRadius: 4 }}>
-                  <div style={{ height: '100%', borderRadius: 4, background: 'var(--primary-color)', width: r.test_count > 0 ? `${(r.results_entered / r.test_count) * 100}%` : '0%' }} />
+    <>
+      <table className="data-table">
+        <thead><tr>
+          <th>Order #</th><th>Patient</th><th>Date</th><th>Days Pending</th><th>Progress</th>
+        </tr></thead>
+        <tbody>
+          {rows.map(r => (
+            <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => onNavigate(r.id)}>
+              <td><span className="font-mono" style={{ color: 'var(--primary-color)' }}>{r.order_number}</span></td>
+              <td><strong>{r.patient_name}</strong><br /><small style={{ color: 'var(--text-secondary)' }}>{r.patient_ref}</small></td>
+              <td>{fmtDate(r.order_date)}</td>
+              <td>
+                <span style={{ fontWeight: 700, color: r.days_pending > 3 ? '#ef4444' : r.days_pending > 1 ? '#f59e0b' : '#10b981' }}>
+                  {r.days_pending}d
+                </span>
+              </td>
+              <td>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ flex: 1, height: 6, background: 'var(--border-color)', borderRadius: 4 }}>
+                    <div style={{ height: '100%', borderRadius: 4, background: 'var(--primary-color)', width: r.test_count > 0 ? `${(r.results_entered / r.test_count) * 100}%` : '0%' }} />
+                  </div>
+                  <span style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{r.results_entered}/{r.test_count}</span>
                 </div>
-                <span style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{r.results_entered}/{r.test_count}</span>
-              </div>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <Pagination total={data.length} page={page} pageSize={RPT_PAGE_SIZE} onChange={setPage} />
+    </>
   );
 }
 
 function WorkloadTable({ data }: { data: WorkloadStat[] }) {
+  const [page, setPage] = useState(1);
   if (!data.length) return <div className="empty-state" style={{ padding: 32 }}><p>No data found for selected period.</p></div>;
+  const rows = data.slice((page - 1) * RPT_PAGE_SIZE, page * RPT_PAGE_SIZE);
   return (
-    <table className="data-table">
-      <thead><tr><th>Date</th><th>Staff</th><th>Orders</th><th>Tests</th><th>Completed</th></tr></thead>
-      <tbody>
-        {data.map((r, i) => (
-          <tr key={i}>
-            <td>{r.date}</td>
-            <td><strong>{r.user_name}</strong></td>
-            <td>{r.orders_count}</td>
-            <td>{r.tests_count}</td>
-            <td><span style={{ color: '#10b981', fontWeight: 600 }}>{r.completed_count}</span></td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <>
+      <table className="data-table">
+        <thead><tr><th>Date</th><th>Staff</th><th>Orders</th><th>Tests</th><th>Completed</th></tr></thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i}>
+              <td>{r.date}</td>
+              <td><strong>{r.user_name}</strong></td>
+              <td>{r.orders_count}</td>
+              <td>{r.tests_count}</td>
+              <td><span style={{ color: '#10b981', fontWeight: 600 }}>{r.completed_count}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <Pagination total={data.length} page={page} pageSize={RPT_PAGE_SIZE} onChange={setPage} />
+    </>
   );
 }
 
 function FinancialTable({ data }: { data: FinancialStat[] }) {
+  const [page, setPage] = useState(1);
   if (!data.length) return <div className="empty-state" style={{ padding: 32 }}><p>No data found for selected period.</p></div>;
   const totals = data.reduce((acc, r) => ({
     billed: acc.billed + r.total_billed,
@@ -235,7 +249,7 @@ function FinancialTable({ data }: { data: FinancialStat[] }) {
       <table className="data-table">
         <thead><tr><th>Period</th><th>Orders</th><th>Billed</th><th>Collected</th><th>Discount</th><th>Outstanding</th></tr></thead>
         <tbody>
-          {data.map((r, i) => (
+          {data.slice((page - 1) * RPT_PAGE_SIZE, page * RPT_PAGE_SIZE).map((r, i) => (
             <tr key={i}>
               <td><strong>{r.period}</strong></td>
               <td>{r.order_count}</td>
@@ -247,14 +261,17 @@ function FinancialTable({ data }: { data: FinancialStat[] }) {
           ))}
         </tbody>
       </table>
+      <Pagination total={data.length} page={page} pageSize={RPT_PAGE_SIZE} onChange={setPage} />
     </div>
   );
 }
 
 function TATTable({ data, onNavigate }: { data: TATItem[]; onNavigate: (id: number) => void }) {
+  const [page, setPage] = useState(1);
   if (!data.length) return <div className="empty-state" style={{ padding: 32 }}><p>No data found for selected period.</p></div>;
   const withResult = data.filter(r => r.tat_hours != null);
   const avg = withResult.length > 0 ? withResult.reduce((s, r) => s + (r.tat_hours ?? 0), 0) / withResult.length : 0;
+  const rows = data.slice((page - 1) * RPT_PAGE_SIZE, page * RPT_PAGE_SIZE);
   return (
     <div>
       {withResult.length > 0 && (
@@ -266,7 +283,7 @@ function TATTable({ data, onNavigate }: { data: TATItem[]; onNavigate: (id: numb
       <table className="data-table">
         <thead><tr><th>Order #</th><th>Patient</th><th>Ordered</th><th>Result Date</th><th>TAT (hrs)</th><th>Status</th></tr></thead>
         <tbody>
-          {data.map(r => (
+          {rows.map(r => (
             <tr key={r.order_id} style={{ cursor: 'pointer' }} onClick={() => onNavigate(r.order_id)}>
               <td><span className="font-mono" style={{ color: 'var(--primary-color)' }}>{r.order_number}</span></td>
               <td>{r.patient_name}</td>
@@ -284,30 +301,36 @@ function TATTable({ data, onNavigate }: { data: TATItem[]; onNavigate: (id: numb
           ))}
         </tbody>
       </table>
+      <Pagination total={data.length} page={page} pageSize={RPT_PAGE_SIZE} onChange={setPage} />
     </div>
   );
 }
 
 function CriticalTable({ data, onNavigate }: { data: CriticalItem[]; onNavigate: (id: number) => void }) {
+  const [page, setPage] = useState(1);
   if (!data.length) return <div className="empty-state" style={{ padding: 32 }}><p>No critical values found for selected period.</p></div>;
+  const rows = data.slice((page - 1) * RPT_PAGE_SIZE, page * RPT_PAGE_SIZE);
   return (
-    <table className="data-table">
-      <thead><tr><th>Order #</th><th>Patient</th><th>Test</th><th>Result</th><th>Date</th></tr></thead>
-      <tbody>
-        {data.map((r, i) => (
-          <tr key={i} style={{ cursor: 'pointer' }} onClick={() => onNavigate(r.order_id)}>
-            <td><span className="font-mono" style={{ color: 'var(--primary-color)' }}>{r.order_number}</span></td>
-            <td><strong>{r.patient_name}</strong><br /><small style={{ color: 'var(--text-secondary)' }}>{r.patient_ref}</small></td>
-            <td>{r.test_name}</td>
-            <td>
-              <strong style={{ color: '#ef4444' }}>{r.result_value}</strong>
-              {r.unit && <span style={{ color: 'var(--text-secondary)', marginLeft: 4 }}>{r.unit}</span>}
-              <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: '#ef4444', background: 'rgba(239,68,68,0.12)', padding: '1px 5px', borderRadius: 4 }}>C</span>
-            </td>
-            <td>{fmtDate(r.result_date)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <>
+      <table className="data-table">
+        <thead><tr><th>Order #</th><th>Patient</th><th>Test</th><th>Result</th><th>Date</th></tr></thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} style={{ cursor: 'pointer' }} onClick={() => onNavigate(r.order_id)}>
+              <td><span className="font-mono" style={{ color: 'var(--primary-color)' }}>{r.order_number}</span></td>
+              <td><strong>{r.patient_name}</strong><br /><small style={{ color: 'var(--text-secondary)' }}>{r.patient_ref}</small></td>
+              <td>{r.test_name}</td>
+              <td>
+                <strong style={{ color: '#ef4444' }}>{r.result_value}</strong>
+                {r.unit && <span style={{ color: 'var(--text-secondary)', marginLeft: 4 }}>{r.unit}</span>}
+                <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: '#ef4444', background: 'rgba(239,68,68,0.12)', padding: '1px 5px', borderRadius: 4 }}>C</span>
+              </td>
+              <td>{fmtDate(r.result_date)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <Pagination total={data.length} page={page} pageSize={RPT_PAGE_SIZE} onChange={setPage} />
+    </>
   );
 }

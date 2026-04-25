@@ -11,7 +11,7 @@ import Swal from 'sweetalert2';
 
 const emptyForm = (): CreatePatientInput => ({ full_name: '', age: undefined, gender: '', phone: '', email: '', address: '' });
 const fmtDate = (s: string) => new Date(s).toLocaleDateString();
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 const GENDER_OPTIONS = [
   { value: '', label: '— Select Gender —' },

@@ -15,7 +15,7 @@ import Swal from 'sweetalert2';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const fmtDate = (s: string) => new Date(s).toLocaleDateString();
-const ORDER_PAGE_SIZE = 15;
+const ORDER_PAGE_SIZE = 10;
 
 interface ResultEntry {
   result_value: string;

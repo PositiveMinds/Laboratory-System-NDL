@@ -10,7 +10,7 @@ import Pagination from '../components/Pagination';
 import PageLoader from '../components/PageLoader';
 
 const fmtDate = (s: string) => new Date(s).toLocaleDateString();
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Status' },

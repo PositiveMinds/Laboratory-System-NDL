@@ -6,23 +6,29 @@ import {
   getUsers, createUser, deleteUser, unlockUser, updateUserEmail,
   getTestCategories, getTests, updateTestPrice,
   createTestCategory, deleteTestCategory, renameTestCategory, createTest, deleteTest,
-  changePassword, getReferenceRanges, saveReferenceRange, deleteReferenceRange, backupDatabase,
+  changePassword, updateProfile, getReferenceRanges, saveReferenceRange, deleteReferenceRange, backupDatabase,
   getAuditLogs, restoreDatabase, saveSmtpConfig, getSmtpConfig, sendEmailSmtp,
 } from '../lib/api';
 import type { UserInfo, TestItem, TestCategory, ReferenceRange, AuditLog } from '../types';
 import Modal from '../components/Modal';
 import EZSelect from '../components/EZSelect';
+import Pagination from '../components/Pagination';
 import PageLoader from '../components/PageLoader';
 import Swal from 'sweetalert2';
 import { fmtUGX } from '../lib/currency';
 import { Lock, Unlock, Plus, Trash2, Pencil, Database, Save } from 'lucide-react';
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'profile' | 'users' | 'tests' | 'email' | 'printing' | 'ranges' | 'backup' | 'audit'>('profile');
 
   // Profile / Password
+  const [profileFullName, setProfileFullName] = useState(() => user?.full_name || '');
+  const [profilePhone, setProfilePhone] = useState(() => user?.phone || '');
+  const [profileTitle, setProfileTitle] = useState(() => user?.title || '');
+  const [profileEmail, setProfileEmail] = useState(() => user?.email || '');
+  const [profileSaving, setProfileSaving] = useState(false);
   const [oldPw, setOldPw] = useState('');
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
@@ -30,6 +36,7 @@ export default function Settings() {
 
   // Users
   const [users, setUsers] = useState<UserInfo[]>([]);
+  const [usersPage, setUsersPage] = useState(1);
   const [loadingUsers, setLoadingUsers] = useMinLoading(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [userForm, setUserForm] = useState({ username: '', full_name: '', email: '', password: '', role: 'lab_tech' });
@@ -82,7 +89,17 @@ export default function Settings() {
 
   // Audit Log
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [auditPage, setAuditPage] = useState(1);
   const [loadingAudit, setLoadingAudit] = useMinLoading(false);
+
+  useEffect(() => {
+    if (user) {
+      setProfileFullName(user.full_name || '');
+      setProfilePhone(user.phone || '');
+      setProfileTitle(user.title || '');
+      setProfileEmail(user.email || '');
+    }
+  }, [user]);
 
   useEffect(() => {
     if (activeTab === 'users' && user?.role === 'admin') {
@@ -119,6 +136,22 @@ export default function Settings() {
       }).catch(() => {});
     }
   }, [activeTab, user]);
+
+  const handleSaveProfile = async () => {
+    if (!profileFullName.trim()) {
+      Swal.fire({ icon: 'warning', title: 'Required', text: 'Full name is required.', confirmButtonColor: '#f54927' }); return;
+    }
+    setProfileSaving(true);
+    try {
+      const updated = await updateProfile(profileFullName, profilePhone || undefined, profileTitle || undefined, profileEmail || undefined);
+      setUser(updated);
+      Swal.fire({ icon: 'success', title: 'Profile Updated', timer: 2000, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   const handleChangePassword = async () => {
     if (!oldPw || !newPw || !confirmPw) {
@@ -554,20 +587,20 @@ export default function Settings() {
 
       {activeTab === 'profile' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
-          <div className="card">
-            <div className="card-header"><div className="card-title">Account Information</div></div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
-              <div style={{ width: 56, height: 56, background: 'var(--primary-color)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 20, fontWeight: 800, flexShrink: 0 }}>
-                {user?.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 16 }}>{user?.full_name}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>@{user?.username}</div>
-                <span className={`badge badge-${user?.role}`} style={{ marginTop: 4 }}>{user?.role}</span>
-              </div>
+          {/* Avatar + identity summary */}
+          <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ width: 60, height: 60, background: 'var(--primary-color)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 22, fontWeight: 800, flexShrink: 0 }}>
+              {(profileFullName || user?.full_name || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>{user?.full_name}</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>@{user?.username}</div>
+              {user?.title && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{user.title}</div>}
+              <span className={`badge badge-${user?.role}`} style={{ marginTop: 4 }}>{user?.role}</span>
             </div>
           </div>
 
+          {/* Appearance */}
           <div className="card">
             <div className="card-header"><div className="card-title">Appearance</div></div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -581,6 +614,38 @@ export default function Settings() {
             </div>
           </div>
 
+          {/* Edit Profile */}
+          <div className="card" style={{ gridColumn: '1/-1', maxWidth: 520 }}>
+            <div className="card-header"><div className="card-title">Edit Profile</div></div>
+            <div className="form-row">
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Full Name <span className="required">*</span></label>
+                <input className="form-control" value={profileFullName} onChange={e => setProfileFullName(e.target.value)} placeholder="Your full name" />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Title / Position</label>
+                <input className="form-control" value={profileTitle} onChange={e => setProfileTitle(e.target.value)} placeholder="e.g. Senior Lab Technician" />
+              </div>
+            </div>
+            <div className="form-row mt-16">
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Phone</label>
+                <input className="form-control" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} placeholder="e.g. 0712 345 678" />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Email</label>
+                <input className="form-control" type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} placeholder="you@example.com" />
+              </div>
+            </div>
+            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--text-secondary)' }}>
+              Username (@{user?.username}) cannot be changed.
+            </div>
+            <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleSaveProfile} disabled={profileSaving}>
+              {profileSaving ? <><span className="spinner" style={{ width: 14, height: 14 }} /> Saving...</> : 'Save Profile'}
+            </button>
+          </div>
+
+          {/* Change Password */}
           <div className="card" style={{ gridColumn: '1/-1', maxWidth: 480 }}>
             <div className="card-header"><div className="card-title">Change Password</div></div>
             <div className="form-group">
@@ -658,59 +723,62 @@ export default function Settings() {
           {loadingUsers ? (
             <PageLoader label="Loading users..." />
           ) : (
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr><th>Full Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr>
-                </thead>
-                <tbody>
-                  {users.map(u => {
-                    const locked = isLocked(u);
-                    return (
-                      <tr key={u.id}>
-                        <td style={{ fontWeight: 600 }}>{u.full_name}</td>
-                        <td>@{u.username}</td>
-                        <td style={{ fontSize: 12 }}>
-                          <button onClick={() => handleUpdateEmail(u.id, u.email || '')}
-                            style={{ background: 'none', border: 'none', color: u.email ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontSize: 12, textDecoration: u.email ? 'none' : 'underline' }}>
-                            {u.email || 'Set email'}
-                          </button>
-                        </td>
-                        <td><span className={`badge badge-${u.role}`}>{u.role}</span></td>
-                        <td>
-                          {locked ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--danger-color)', fontWeight: 600 }}>
-                              <Lock size={12} /> Locked
-                            </span>
-                          ) : u.failed_attempts > 0 ? (
-                            <span style={{ fontSize: 12, color: '#f59e0b' }}>{u.failed_attempts} failed</span>
-                          ) : (
-                            <span style={{ fontSize: 12, color: '#10b981' }}>Active</span>
-                          )}
-                        </td>
-                        <td style={{ fontSize: 12 }}>{new Date(u.created_at).toLocaleDateString()}</td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            {locked && (
-                              <button className="btn btn-secondary btn-sm"
-                                onClick={() => handleUnlockUser(u.id, u.username)}
-                                title="Unlock account"
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                <Unlock size={12} /> Unlock
-                              </button>
+            <>
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr><th>Full Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+                  </thead>
+                  <tbody>
+                    {users.slice((usersPage - 1) * 10, usersPage * 10).map(u => {
+                      const locked = isLocked(u);
+                      return (
+                        <tr key={u.id}>
+                          <td style={{ fontWeight: 600 }}>{u.full_name}</td>
+                          <td>@{u.username}</td>
+                          <td style={{ fontSize: 12 }}>
+                            <button onClick={() => handleUpdateEmail(u.id, u.email || '')}
+                              style={{ background: 'none', border: 'none', color: u.email ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontSize: 12, textDecoration: u.email ? 'none' : 'underline' }}>
+                              {u.email || 'Set email'}
+                            </button>
+                          </td>
+                          <td><span className={`badge badge-${u.role}`}>{u.role}</span></td>
+                          <td>
+                            {locked ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--danger-color)', fontWeight: 600 }}>
+                                <Lock size={12} /> Locked
+                              </span>
+                            ) : u.failed_attempts > 0 ? (
+                              <span style={{ fontSize: 12, color: '#f59e0b' }}>{u.failed_attempts} failed</span>
+                            ) : (
+                              <span style={{ fontSize: 12, color: '#10b981' }}>Active</span>
                             )}
-                            {u.id !== user.id && (
-                              <button className="btn btn-danger btn-sm"
-                                onClick={() => handleDeleteUser(u.id, u.username)}>Delete</button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+                          <td style={{ fontSize: 12 }}>{new Date(u.created_at).toLocaleDateString()}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              {locked && (
+                                <button className="btn btn-secondary btn-sm"
+                                  onClick={() => handleUnlockUser(u.id, u.username)}
+                                  title="Unlock account"
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                  <Unlock size={12} /> Unlock
+                                </button>
+                              )}
+                              {u.id !== user.id && (
+                                <button className="btn btn-danger btn-sm"
+                                  onClick={() => handleDeleteUser(u.id, u.username)}>Delete</button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination total={users.length} page={usersPage} pageSize={10} onChange={setUsersPage} />
+            </>
           )}
         </div>
       )}
@@ -1111,20 +1179,23 @@ export default function Settings() {
             ) : auditLogs.length === 0 ? (
               <div className="empty-state" style={{ padding: 32 }}><p>No audit log entries yet.</p></div>
             ) : (
-              <table className="data-table">
-                <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
-                <tbody>
-                  {auditLogs.map(log => (
-                    <tr key={log.id}>
-                      <td style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{new Date(log.created_at).toLocaleString()}</td>
-                      <td><strong>{log.user_name || '—'}</strong></td>
-                      <td><span style={{ fontFamily: 'monospace', fontSize: 12 }}>{log.action}</span></td>
-                      <td style={{ fontSize: 11 }}>{log.entity_type ? `${log.entity_type} #${log.entity_id ?? ''}` : '—'}</td>
-                      <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{log.details || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <>
+                <table className="data-table">
+                  <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
+                  <tbody>
+                    {auditLogs.slice((auditPage - 1) * 10, auditPage * 10).map(log => (
+                      <tr key={log.id}>
+                        <td style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{new Date(log.created_at).toLocaleString()}</td>
+                        <td><strong>{log.user_name || '—'}</strong></td>
+                        <td><span style={{ fontFamily: 'monospace', fontSize: 12 }}>{log.action}</span></td>
+                        <td style={{ fontSize: 11 }}>{log.entity_type ? `${log.entity_type} #${log.entity_id ?? ''}` : '—'}</td>
+                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{log.details || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <Pagination total={auditLogs.length} page={auditPage} pageSize={10} onChange={setAuditPage} />
+              </>
             )}
           </div>
         </div>

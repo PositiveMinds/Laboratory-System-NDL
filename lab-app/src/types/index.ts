@@ -3,6 +3,9 @@ export interface SessionUser {
   username: string;
   full_name: string;
   role: 'admin' | 'lab_tech';
+  phone?: string;
+  title?: string;
+  email?: string;
 }
 
 export interface Patient {
@@ -163,6 +166,8 @@ export interface UserInfo {
   full_name: string;
   role: string;
   email?: string;
+  phone?: string;
+  title?: string;
   failed_attempts: number;
   locked_until?: string;
   created_at: string;

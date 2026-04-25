@@ -1,13 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Moon, Sun, Plus, Search } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Moon, Sun, Plus, Search, ChevronLeft } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { globalSearch } from '../lib/api';
 import type { SearchResult } from '../types';
 
+const TOP_LEVEL = new Set(['/dashboard', '/patients', '/orders', '/billing', '/results', '/settings', '/reports']);
+
 export default function Header() {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+  const canGoBack = !TOP_LEVEL.has(location.pathname);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -51,6 +55,16 @@ export default function Header() {
 
   return (
     <header className="top-header">
+      {canGoBack && (
+        <button
+          onClick={() => navigate(-1)}
+          className="icon-btn"
+          title="Go back"
+          style={{ flexShrink: 0 }}
+        >
+          <ChevronLeft size={18} />
+        </button>
+      )}
       <div ref={containerRef} style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <Search size={14} style={{ position: 'absolute', left: 10, color: 'var(--text-secondary)', pointerEvents: 'none' }} />

@@ -20,7 +20,7 @@ import Swal from 'sweetalert2';
 import { fmtUGX } from '../lib/currency';
 
 const fmtDate = (s: string) => new Date(s).toLocaleDateString();
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 const PAY_FILTER_OPTIONS = [
   { value: 'all',     label: 'All Payments' },
