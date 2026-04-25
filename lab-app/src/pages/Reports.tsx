@@ -92,42 +92,38 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters — keep both controls always mounted; toggle visibility to avoid
+          EZDateTimePicker destroy() corrupting the DOM on remount */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          {tab !== 'pending' && (
-            <div>
-              <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Date Range</label>
-              <div style={{ width: 260 }}>
-                <EZDatePicker
-                  key={`reports-range-${tab}`}
-                  value=""
-                  onChange={() => {}}
-                  mode="daterange"
-                  placeholder="Select date range"
-                  className="form-control"
-                  onRangeChange={(start, end) => { setDateFrom(start); setDateTo(end); }}
-                />
-              </div>
+          <div style={{ display: tab !== 'pending' ? 'block' : 'none' }}>
+            <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Date Range</label>
+            <div style={{ width: 260 }}>
+              <EZDatePicker
+                value=""
+                onChange={() => {}}
+                mode="daterange"
+                placeholder="Select date range"
+                className="form-control"
+                onRangeChange={(start, end) => { setDateFrom(start); setDateTo(end); }}
+              />
             </div>
-          )}
-          {tab === 'financial' && (
-            <div>
-              <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Group By</label>
-              <div style={{ width: 130 }}>
-                <EZSelect
-                  value={period}
-                  onChange={setPeriod}
-                  options={[
-                    { value: 'day', label: 'Day' },
-                    { value: 'week', label: 'Week' },
-                    { value: 'month', label: 'Month' },
-                  ]}
-                  searchable={false}
-                />
-              </div>
+          </div>
+          <div style={{ display: tab === 'financial' ? 'block' : 'none' }}>
+            <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Group By</label>
+            <div style={{ width: 130 }}>
+              <EZSelect
+                value={period}
+                onChange={setPeriod}
+                options={[
+                  { value: 'day', label: 'Day' },
+                  { value: 'week', label: 'Week' },
+                  { value: 'month', label: 'Month' },
+                ]}
+                searchable={false}
+              />
             </div>
-          )}
+          </div>
           <button className="btn btn-primary" onClick={runReport} disabled={loading}>
             {loading ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Running…</> : 'Run Report'}
           </button>
