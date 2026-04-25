@@ -327,6 +327,18 @@ pub struct ResultHistory {
     pub order_id: i64,
 }
 
+// ─── SMTP Config ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SmtpConfig {
+    pub host: String,
+    pub port: u16,
+    pub username: String,
+    pub from_name: String,
+    pub from_email: String,
+    pub use_tls: bool,
+}
+
 // ─── Input Types ──────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
@@ -494,6 +506,10 @@ fn init_db(conn: &Connection) -> rusqlite::Result<()> {
             unit TEXT NOT NULL DEFAULT '',
             reference_range TEXT NOT NULL DEFAULT '',
             FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
         );
     ")?;
     // Migrations: ignore errors if columns already exist
@@ -1695,6 +1711,121 @@ pub mod commands {
         rows.collect::<rusqlite::Result<Vec<_>>>().map_err(|e| e.to_string())
     }
 
+    // SMTP
+    #[tauri::command]
+    pub fn save_smtp_config(input: serde_json::Value, state: State<AppState>) -> Result<(), String> {
+        require_session(&state.session)?;
+        let db = state.db.lock().map_err(|_| "DB lock error".to_string())?;
+        let host = input["host"].as_str().unwrap_or("").to_string();
+        let port = input["port"].as_u64().unwrap_or(587) as u16;
+        let username = input["username"].as_str().unwrap_or("").to_string();
+        let password = input["password"].as_str().unwrap_or("").to_string();
+        let from_name = input["from_name"].as_str().unwrap_or("").to_string();
+        let from_email = input["from_email"].as_str().unwrap_or("").to_string();
+        let use_tls = input["use_tls"].as_bool().unwrap_or(true);
+        let port_str = port.to_string();
+        let tls_str = if use_tls { "1" } else { "0" };
+        let settings: &[(&str, &str)] = &[
+            ("smtp_host", &host),
+            ("smtp_port", &port_str),
+            ("smtp_username", &username),
+            ("smtp_password", &password),
+            ("smtp_from_name", &from_name),
+            ("smtp_from_email", &from_email),
+            ("smtp_use_tls", tls_str),
+        ];
+        for (key, value) in settings {
+            db.execute(
+                "INSERT INTO app_settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![key, value],
+            ).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
+    #[tauri::command]
+    pub fn get_smtp_config(state: State<AppState>) -> Result<Option<SmtpConfig>, String> {
+        require_session(&state.session)?;
+        let db = state.db.lock().map_err(|_| "DB lock error".to_string())?;
+        let get = |key: &str| -> String {
+            db.query_row(
+                "SELECT value FROM app_settings WHERE key = ?1",
+                params![key],
+                |r| r.get::<_, String>(0),
+            ).unwrap_or_default()
+        };
+        let host = get("smtp_host");
+        if host.is_empty() { return Ok(None); }
+        Ok(Some(SmtpConfig {
+            host,
+            port: get("smtp_port").parse().unwrap_or(587),
+            username: get("smtp_username"),
+            from_name: get("smtp_from_name"),
+            from_email: get("smtp_from_email"),
+            use_tls: get("smtp_use_tls") == "1",
+        }))
+    }
+
+    #[tauri::command]
+    pub fn send_email_smtp(to_email: String, subject: String, html_body: String, state: State<AppState>) -> Result<(), String> {
+        use lettre::message::{header::ContentType, Mailbox};
+        use lettre::transport::smtp::authentication::Credentials;
+        use lettre::{Message, SmtpTransport, Transport};
+
+        require_session(&state.session)?;
+        let (host, port, username, password, from_name, from_email, use_tls) = {
+            let db = state.db.lock().map_err(|_| "DB lock error".to_string())?;
+            let get = |key: &str| -> String {
+                db.query_row(
+                    "SELECT value FROM app_settings WHERE key = ?1",
+                    params![key],
+                    |r| r.get::<_, String>(0),
+                ).unwrap_or_default()
+            };
+            (
+                get("smtp_host"),
+                get("smtp_port").parse::<u16>().unwrap_or(587),
+                get("smtp_username"),
+                get("smtp_password"),
+                get("smtp_from_name"),
+                get("smtp_from_email"),
+                get("smtp_use_tls") == "1",
+            )
+        };
+        if host.is_empty() {
+            return Err("SMTP is not configured. Go to Settings → Email.".to_string());
+        }
+        let from: Mailbox = format!("{} <{}>", from_name, from_email)
+            .parse()
+            .map_err(|e: lettre::address::AddressError| format!("Invalid from address: {e}"))?;
+        let to: Mailbox = to_email
+            .parse()
+            .map_err(|e: lettre::address::AddressError| format!("Invalid to address: {e}"))?;
+        let email = Message::builder()
+            .from(from)
+            .to(to)
+            .subject(subject)
+            .header(ContentType::TEXT_HTML)
+            .body(html_body)
+            .map_err(|e| e.to_string())?;
+        let creds = Credentials::new(username, password);
+        let transport = if use_tls {
+            SmtpTransport::relay(&host)
+                .map_err(|e| e.to_string())?
+                .port(port)
+                .credentials(creds)
+                .build()
+        } else {
+            SmtpTransport::starttls_relay(&host)
+                .map_err(|e| e.to_string())?
+                .port(port)
+                .credentials(creds)
+                .build()
+        };
+        transport.send(&email).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     // Dashboard
     #[tauri::command]
     pub fn get_dashboard_stats(state: State<AppState>) -> Result<DashboardStats, String> {
@@ -1764,6 +1895,7 @@ pub fn run() {
             commands::get_critical_values_report,
             commands::global_search, commands::get_audit_logs,
             commands::restore_database, commands::get_result_history,
+            commands::save_smtp_config, commands::get_smtp_config, commands::send_email_smtp,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -6,7 +6,7 @@ import {
   getTestCategories, getTests, updateTestPrice,
   createTestCategory, deleteTestCategory, renameTestCategory, createTest, deleteTest,
   changePassword, getReferenceRanges, saveReferenceRange, deleteReferenceRange, backupDatabase,
-  getAuditLogs, restoreDatabase,
+  getAuditLogs, restoreDatabase, saveSmtpConfig, getSmtpConfig, sendEmailSmtp,
 } from '../lib/api';
 import type { UserInfo, TestItem, TestCategory, ReferenceRange, AuditLog } from '../types';
 import Modal from '../components/Modal';
@@ -47,6 +47,18 @@ export default function Settings() {
   const [ejResultsTplId, setEjResultsTplId] = useState(() => localStorage.getItem('emailjs_results_template_id') || '');
   const [ejReceiptTplId, setEjReceiptTplId] = useState(() => localStorage.getItem('emailjs_receipt_template_id') || '');
   const [ejPublicKey, setEjPublicKey] = useState(() => localStorage.getItem('emailjs_public_key') || '');
+
+  // SMTP
+  const [smtpHost, setSmtpHost] = useState('');
+  const [smtpPort, setSmtpPort] = useState('587');
+  const [smtpUser, setSmtpUser] = useState('');
+  const [smtpPass, setSmtpPass] = useState('');
+  const [smtpFromName, setSmtpFromName] = useState('Noble Diagnostic Laboratory');
+  const [smtpFromEmail, setSmtpFromEmail] = useState('');
+  const [smtpUseTls, setSmtpUseTls] = useState(true);
+  const [smtpLoading, setSmtpLoading] = useState(false);
+  const [smtpTesting, setSmtpTesting] = useState(false);
+  const [smtpTestEmail, setSmtpTestEmail] = useState('');
 
   // Printer settings
   const [paperSize, setPaperSize] = useState(() => localStorage.getItem('printer_paper_size') || '80mm');
@@ -92,6 +104,18 @@ export default function Settings() {
     if (activeTab === 'audit' && user?.role === 'admin') {
       setLoadingAudit(true);
       getAuditLogs(200, 0).then(setAuditLogs).finally(() => setLoadingAudit(false));
+    }
+    if (activeTab === 'email' && user?.role === 'admin') {
+      getSmtpConfig().then(cfg => {
+        if (cfg) {
+          setSmtpHost(cfg.host);
+          setSmtpPort(String(cfg.port));
+          setSmtpUser(cfg.username);
+          setSmtpFromName(cfg.from_name);
+          setSmtpFromEmail(cfg.from_email);
+          setSmtpUseTls(cfg.use_tls);
+        }
+      }).catch(() => {});
     }
   }, [activeTab, user]);
 
@@ -426,6 +450,49 @@ export default function Settings() {
     }
   };
 
+  const handleSaveSmtp = async () => {
+    if (!smtpHost) {
+      Swal.fire({ icon: 'warning', title: 'Required', text: 'SMTP host is required.', confirmButtonColor: '#f54927' }); return;
+    }
+    setSmtpLoading(true);
+    try {
+      await saveSmtpConfig({
+        host: smtpHost.trim(),
+        port: parseInt(smtpPort) || 587,
+        username: smtpUser.trim(),
+        password: smtpPass,
+        from_name: smtpFromName.trim(),
+        from_email: smtpFromEmail.trim(),
+        use_tls: smtpUseTls,
+      });
+      setSmtpPass('');
+      Swal.fire({ icon: 'success', title: 'SMTP Config Saved', timer: 1500, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+    } finally {
+      setSmtpLoading(false);
+    }
+  };
+
+  const handleTestSmtp = async () => {
+    if (!smtpTestEmail) {
+      Swal.fire({ icon: 'warning', title: 'Required', text: 'Enter a test email address.', confirmButtonColor: '#f54927' }); return;
+    }
+    setSmtpTesting(true);
+    try {
+      await sendEmailSmtp(
+        smtpTestEmail,
+        'NDL Lab System — SMTP Test',
+        '<p>This is a test email from <strong>Noble Diagnostic Laboratory</strong> system.</p><p>SMTP is configured correctly.</p>',
+      );
+      Swal.fire({ icon: 'success', title: 'Test Email Sent', text: `Check ${smtpTestEmail}`, confirmButtonColor: '#f54927' });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Send Failed', text: String(err), confirmButtonColor: '#f54927' });
+    } finally {
+      setSmtpTesting(false);
+    }
+  };
+
   const saveEmailJsConfig = () => {
     localStorage.setItem('emailjs_service_id', ejServiceId.trim());
     localStorage.setItem('emailjs_template_id', ejTemplateId.trim());
@@ -454,7 +521,7 @@ export default function Settings() {
       { key: 'users', label: 'User Management' },
       { key: 'tests', label: 'Test Prices' },
       { key: 'ranges', label: 'Reference Ranges' },
-      { key: 'email', label: 'Email (EmailJS)' },
+      { key: 'email', label: 'Email' },
       { key: 'backup', label: 'Backup & Restore' },
       { key: 'audit', label: 'Audit Log' },
     ] : []),
@@ -753,7 +820,76 @@ export default function Settings() {
               <input className="form-control" placeholder="e.g. template_receipt789"
                 value={ejReceiptTplId} onChange={e => setEjReceiptTplId(e.target.value)} />
             </div>
-            <button className="btn btn-primary" onClick={saveEmailJsConfig}>Save Email Config</button>
+            <button className="btn btn-primary" onClick={saveEmailJsConfig}>Save EmailJS Config</button>
+          </div>
+
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="card-header">
+              <div>
+                <div className="card-title">SMTP Configuration (Fallback)</div>
+                <div className="card-subtitle">Used automatically when EmailJS is not configured or fails. Works with Gmail, Outlook, or any SMTP server.</div>
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">SMTP Host</label>
+                <input className="form-control" placeholder="e.g. smtp.gmail.com"
+                  value={smtpHost} onChange={e => setSmtpHost(e.target.value)} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Port</label>
+                <input className="form-control" type="number" placeholder="587"
+                  value={smtpPort} onChange={e => setSmtpPort(e.target.value)} style={{ maxWidth: 90 }} />
+              </div>
+            </div>
+            <div className="form-row mt-16">
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Username / Email</label>
+                <input className="form-control" placeholder="your@gmail.com"
+                  value={smtpUser} onChange={e => setSmtpUser(e.target.value)} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Password / App Password</label>
+                <input className="form-control" type="password" placeholder="Leave blank to keep existing"
+                  value={smtpPass} onChange={e => setSmtpPass(e.target.value)} />
+              </div>
+            </div>
+            <div className="form-row mt-16">
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">From Name</label>
+                <input className="form-control" placeholder="Noble Diagnostic Laboratory"
+                  value={smtpFromName} onChange={e => setSmtpFromName(e.target.value)} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">From Email</label>
+                <input className="form-control" placeholder="noreply@ndl.ug"
+                  value={smtpFromEmail} onChange={e => setSmtpFromEmail(e.target.value)} />
+              </div>
+            </div>
+            <div className="form-group mt-16">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <input type="checkbox" checked={smtpUseTls} onChange={e => setSmtpUseTls(e.target.checked)}
+                  style={{ width: 16, height: 16 }} />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>Use TLS (port 465)</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Uncheck for STARTTLS (port 587). Gmail requires port 465 with TLS.</div>
+                </div>
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
+              <button className="btn btn-primary" onClick={handleSaveSmtp} disabled={smtpLoading}>
+                {smtpLoading ? <><span className="spinner" style={{ width: 14, height: 14 }} /> Saving...</> : 'Save SMTP Config'}
+              </button>
+              <input className="form-control" placeholder="test@example.com"
+                value={smtpTestEmail} onChange={e => setSmtpTestEmail(e.target.value)}
+                style={{ maxWidth: 220 }} />
+              <button className="btn btn-secondary" onClick={handleTestSmtp} disabled={smtpTesting}>
+                {smtpTesting ? <><span className="spinner" style={{ width: 14, height: 14 }} /> Sending...</> : 'Send Test Email'}
+              </button>
+            </div>
+            <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius)', fontSize: 12, color: 'var(--text-secondary)' }}>
+              <strong>Gmail tip:</strong> Use an App Password (not your regular password). Enable 2FA in your Google account, then go to Google Account → Security → App Passwords.
+            </div>
           </div>
 
           <div className="card" style={{ marginTop: 16 }}>

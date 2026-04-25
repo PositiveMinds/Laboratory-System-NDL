@@ -280,3 +280,12 @@ export interface ResultHistory {
   order_number: string;
   order_id: number;
 }
+
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  username: string;
+  from_name: string;
+  from_email: string;
+  use_tls: boolean;
+}

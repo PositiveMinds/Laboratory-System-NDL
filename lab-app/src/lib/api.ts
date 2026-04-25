@@ -5,7 +5,7 @@ import type {
   CreatePatientInput, CreateOrderInput, RevenueStat, TopTest,
   ReferenceRange, AutoFillData,
   PendingOrder, WorkloadStat, FinancialStat, TATItem, CriticalItem,
-  AuditLog, SearchResult, ResultHistory,
+  AuditLog, SearchResult, ResultHistory, SmtpConfig,
 } from '../types';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────
@@ -182,3 +182,15 @@ export const restoreDatabase = (bytes: number[]) =>
 // ─── Result History ────────────────────────────────────────────────────────
 export const getResultHistory = (patientId: number, testId: number) =>
   invoke<ResultHistory[]>('get_result_history', { patientId, testId });
+
+// ─── SMTP Email ────────────────────────────────────────────────────────────
+export const saveSmtpConfig = (input: {
+  host: string; port: number; username: string; password: string;
+  from_name: string; from_email: string; use_tls: boolean;
+}) => invoke<void>('save_smtp_config', { input });
+
+export const getSmtpConfig = () =>
+  invoke<SmtpConfig | null>('get_smtp_config');
+
+export const sendEmailSmtp = (toEmail: string, subject: string, htmlBody: string) =>
+  invoke<void>('send_email_smtp', { toEmail, subject, htmlBody });
