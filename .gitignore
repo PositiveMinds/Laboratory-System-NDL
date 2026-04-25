@@ -1,0 +1,33 @@
+node_modules/
+dist/
+.vite/
+target/
+*.db
+*.db-shm
+*.db-wal
+restore_pending.db
+backups/
+.env
+.env.*
+*.pem
+*.key
+
+# Tauri build output
+src-tauri/target/
+src-tauri/gen/
+
+# IDE
+.vscode/settings.json
+.idea/
+*.suo
+*.user
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
