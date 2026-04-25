@@ -4,6 +4,7 @@ import { Search, Check, Loader2, X } from 'lucide-react';
 import { getPatients, getTests, createOrder } from '../lib/api';
 import type { Patient, TestItem } from '../types';
 import PageLoader from '../components/PageLoader';
+import EZDatePicker from '../components/EZDatePicker';
 import Swal from 'sweetalert2';
 import { fmtUGX } from '../lib/currency';
 
@@ -216,7 +217,13 @@ export default function NewOrder() {
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Collection Date/Time</label>
-                  <input className="form-control" type="datetime-local" value={collectedAt} onChange={e => setCollectedAt(e.target.value)} />
+                  <EZDatePicker
+                    value={collectedAt}
+                    onChange={setCollectedAt}
+                    mode="datetime"
+                    placeholder="Select collection date/time"
+                    className="form-control"
+                  />
                 </div>
               </div>
             </div>

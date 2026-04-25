@@ -7,6 +7,8 @@ import {
 } from '../lib/api';
 import type { PendingOrder, WorkloadStat, FinancialStat, TATItem, CriticalItem } from '../types';
 import PageLoader from '../components/PageLoader';
+import EZSelect from '../components/EZSelect';
+import EZDatePicker from '../components/EZDatePicker';
 
 const fmtDate = (s: string) => new Date(s).toLocaleDateString();
 const fmtNum = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -93,25 +95,36 @@ export default function Reports() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           {tab !== 'pending' && (
-            <>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>From</label>
-                <input type="date" className="form-control" style={{ width: 150 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Date Range</label>
+              <div style={{ width: 260 }}>
+                <EZDatePicker
+                  key={`reports-range-${tab}`}
+                  value=""
+                  onChange={() => {}}
+                  mode="daterange"
+                  placeholder="Select date range"
+                  className="form-control"
+                  onRangeChange={(start, end) => { setDateFrom(start); setDateTo(end); }}
+                />
               </div>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>To</label>
-                <input type="date" className="form-control" style={{ width: 150 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
-              </div>
-            </>
+            </div>
           )}
           {tab === 'financial' && (
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Group By</label>
-              <select className="form-control" style={{ width: 120 }} value={period} onChange={e => setPeriod(e.target.value)}>
-                <option value="day">Day</option>
-                <option value="week">Week</option>
-                <option value="month">Month</option>
-              </select>
+              <div style={{ width: 130 }}>
+                <EZSelect
+                  value={period}
+                  onChange={setPeriod}
+                  options={[
+                    { value: 'day', label: 'Day' },
+                    { value: 'week', label: 'Week' },
+                    { value: 'month', label: 'Month' },
+                  ]}
+                  searchable={false}
+                />
+              </div>
             </div>
           )}
           <button className="btn btn-primary" onClick={runReport} disabled={loading}>

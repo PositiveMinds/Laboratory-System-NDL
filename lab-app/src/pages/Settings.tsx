@@ -824,6 +824,7 @@ export default function Settings() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 240, maxWidth: 380 }}>
               <EZSelect
+                key={`ranges-test-${allTestsForRanges.length}`}
                 value={selectedRefTestId}
                 onChange={v => { setSelectedRefTestId(v); loadRangesForTest(Number(v)); }}
                 options={[{ value: '', label: '— Select a test —' }, ...allTestsForRanges.map(t => ({ value: String(t.id), label: `${t.category_name} › ${t.name}` }))]}

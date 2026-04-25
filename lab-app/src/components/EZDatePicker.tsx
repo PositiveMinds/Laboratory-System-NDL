@@ -32,7 +32,7 @@ export default function EZDatePicker({ value, onChange, mode = 'date', placehold
       const isRange = mode === 'daterange';
       instanceRef.current = new window.EZDateTimePicker(inputRef.current!, {
         mode,
-        format: mode === 'date' ? 'YYYY-MM-DD' : mode === 'daterange' ? 'YYYY-MM-DD' : undefined,
+        format: mode === 'date' ? 'YYYY-MM-DD' : mode === 'daterange' ? 'YYYY-MM-DD' : mode === 'datetime' ? 'YYYY-MM-DD HH:mm' : undefined,
         placeholder: placeholder || (isRange ? 'Start — End' : 'Select date'),
         showToday: true,
         showClear: true,
@@ -50,12 +50,24 @@ export default function EZDatePicker({ value, onChange, mode = 'date', placehold
             const fmt = (d: Date) => d.toISOString().slice(0, 10);
             onRangeRef.current?.(fmt(r.start), fmt(r.end));
           } else if (val instanceof Date) {
-            onChangeRef.current(val.toISOString().slice(0, 10));
+            if (mode === 'datetime') {
+              const pad = (n: number) => String(n).padStart(2, '0');
+              const local = `${val.getFullYear()}-${pad(val.getMonth()+1)}-${pad(val.getDate())} ${pad(val.getHours())}:${pad(val.getMinutes())}:00`;
+              onChangeRef.current(local);
+            } else {
+              onChangeRef.current(val.toISOString().slice(0, 10));
+            }
           }
         },
         onChange: (val: unknown) => {
           if (!isRange && val instanceof Date) {
-            onChangeRef.current(val.toISOString().slice(0, 10));
+            if (mode === 'datetime') {
+              const pad = (n: number) => String(n).padStart(2, '0');
+              const local = `${val.getFullYear()}-${pad(val.getMonth()+1)}-${pad(val.getDate())} ${pad(val.getHours())}:${pad(val.getMinutes())}:00`;
+              onChangeRef.current(local);
+            } else {
+              onChangeRef.current(val.toISOString().slice(0, 10));
+            }
           }
         },
       });
