@@ -588,6 +588,57 @@ fn seed_data(conn: &Connection) -> rusqlite::Result<()> {
         "INSERT OR IGNORE INTO users (username, full_name, password_hash, role) VALUES (?1, ?2, ?3, ?4)",
         params!["admin", "System Administrator", pw, "admin"],
     )?;
+
+    // Sample patients (name, age, gender, phone, address)
+    let patients: &[(&str, i64, &str, &str, &str)] = &[
+        ("Nakato Sarah",          28, "Female", "0703456789", "Kampala, Rubaga"),
+        ("Okello James",          45, "Male",   "0754123456", "Gulu, Pece Division"),
+        ("Achen Grace",           32, "Female", "0782345678", "Lira, Northern Uganda"),
+        ("Mugisha Robert",        55, "Male",   "0701234567", "Mbarara, Western Uganda"),
+        ("Namukasa Agnes",        19, "Female", "0712345678", "Kampala, Nakawa"),
+        ("Opio David",            38, "Male",   "0776543210", "Tororo, Eastern Uganda"),
+        ("Namutebi Fatuma",       42, "Female", "0758765432", "Kampala, Mengo"),
+        ("Byamugisha Patrick",    61, "Male",   "0703213456", "Kabale, Western Uganda"),
+        ("Akello Christine",      25, "Female", "0789012345", "Soroti, Eastern Uganda"),
+        ("Ssemakula Hamza",       33, "Male",   "0714567890", "Kampala, Makindye"),
+        ("Auma Mary",             50, "Female", "0772109876", "Arua, West Nile"),
+        ("Kyeyune Emmanuel",      29, "Male",   "0701098765", "Kampala, Kasubi"),
+        ("Nassali Rehema",        36, "Female", "0756789012", "Masaka, Central Uganda"),
+        ("Lakony Henry",          48, "Male",   "0785432109", "Kitgum, Northern Uganda"),
+        ("Nansubuga Beatrice",    22, "Female", "0702234567", "Kampala, Ndeeba"),
+        ("Owor Geoffrey",         54, "Male",   "0775678901", "Adjumani, West Nile"),
+        ("Katusiime Prossy",      44, "Female", "0718901234", "Bushenyi, Western Uganda"),
+        ("Ocen Peter",            31, "Male",   "0793456780", "Lira, Northern Uganda"),
+        ("Nanvubya Juliet",       27, "Female", "0709876543", "Kampala, Bugolobi"),
+        ("Tumwesige Allan",       40, "Male",   "0752345678", "Mbarara, Western Uganda"),
+        ("Alaso Jackline",        35, "Female", "0784321098", "Gulu, Northern Uganda"),
+        ("Ssengooba Moses",       58, "Male",   "0706543219", "Kampala, Wandegeya"),
+        ("Apio Ruth",             23, "Female", "0771234567", "Oyam, Northern Uganda"),
+        ("Kirigwajjo Fred",       46, "Male",   "0795678901", "Kampala, Kira"),
+        ("Namubiru Helen",        60, "Female", "0703901234", "Masaka, Central Uganda"),
+        ("Okello Denis",          17, "Male",   "0758234567", "Jinja, Eastern Uganda"),
+        ("Acen Lillian",          39, "Female", "0712890123", "Pader, Northern Uganda"),
+        ("Ntale Geoffrey",        52, "Male",   "0787654321", "Kampala, Bwaise"),
+        ("Kabasomi Annet",        30, "Female", "0704567890", "Rakai, Central Uganda"),
+        ("Apiny Samuel",          26, "Male",   "0773456781", "Gulu, Northern Uganda"),
+        ("Naigaga Harriet",       47, "Female", "0756012345", "Kampala, Mutundwe"),
+        ("Wafula Charles",        34, "Male",   "0799012345", "Mbale, Eastern Uganda"),
+        ("Akidi Florence",        56, "Female", "0702567890", "Apac, Northern Uganda"),
+        ("Lubwama Richard",       43, "Male",   "0778901234", "Kampala, Namirembe"),
+        ("Nassozi Zam",           21, "Female", "0714012345", "Mpigi, Central Uganda"),
+        ("Olara Kenneth",         67, "Male",   "0781234567", "Kitgum, Northern Uganda"),
+        ("Kyomukama Deborah",     33, "Female", "0706789012", "Rukungiri, Western Uganda"),
+        ("Ssali Isaac",           49, "Male",   "0759123456", "Kampala, Ntinda"),
+        ("Otim Stella",           18, "Female", "0792901234", "Lira, Northern Uganda"),
+        ("Mutumba George",        72, "Male",   "0705678901", "Kampala, Katwe"),
+    ];
+    for (i, (name, age, gender, phone, address)) in patients.iter().enumerate() {
+        let pid = format!("NDL-{:04}", i + 1);
+        conn.execute(
+            "INSERT OR IGNORE INTO patients (patient_id, full_name, age, gender, phone, address) VALUES (?1,?2,?3,?4,?5,?6)",
+            params![pid, name, age, gender, phone, address],
+        )?;
+    }
     Ok(())
 }
 
