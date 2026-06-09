@@ -10,8 +10,8 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@emailjs/browser": "^4.4.1",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
     "@types/jsbarcode": "^3.11.4",
     "jsbarcode": "^3.12.3",
     "lucide-react": "^1.11.0",

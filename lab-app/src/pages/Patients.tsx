@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+﻿import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useMinLoading } from '../hooks/useMinLoading';
 import { Search, Plus, Loader2, UserX, Pencil } from 'lucide-react';
 import { getPatients, createPatient, updatePatient } from '../lib/api';
@@ -53,7 +53,7 @@ export default function Patients() {
 
   const handleSave = async () => {
     if (!form.full_name.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Required', text: 'Patient full name is required.', confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'warning', title: 'Required', text: 'Patient full name is required.', confirmButtonColor: '#78001d' });
       return;
     }
     setSaving(true);
@@ -65,11 +65,11 @@ export default function Patients() {
       } else {
         const created = await createPatient(form);
         setPatients(ps => [created, ...ps]);
-        Swal.fire({ icon: 'success', title: 'Registered', text: `Patient registered as ${created.patient_id}`, confirmButtonColor: '#f54927', timer: 2500, showConfirmButton: false });
+        Swal.fire({ icon: 'success', title: 'Registered', text: `Patient registered as ${created.patient_id}`, confirmButtonColor: '#78001d', timer: 2500, showConfirmButton: false });
       }
       setShowModal(false);
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     } finally {
       setSaving(false);
     }

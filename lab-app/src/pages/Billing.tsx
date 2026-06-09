@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+﻿import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useMinLoading } from '../hooks/useMinLoading';
 import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
@@ -6,9 +6,10 @@ import {
   ClipboardList, CheckCircle, AlertTriangle, CreditCard,
   Printer, ReceiptText, Mail,
 } from 'lucide-react';
-import { getBilling, addPayment, getReceiptData } from '../lib/api';
+import { getBilling, addPayment, getReceiptData, getLogo } from '../lib/api';
+import { useAssets } from '../contexts/AssetsContext';
 import { triggerPrint, autoPrintEnabled } from '../lib/print';
-import { sendReceiptEmail, isEmailConfigured } from '../lib/email';
+import { sendReceiptEmail, sendBalanceReminderEmail } from '../lib/email';
 import type { OrderSummary, ReceiptData } from '../types';
 import Modal from '../components/Modal';
 import PrintReceipt from '../components/PrintReceipt';
@@ -39,6 +40,7 @@ const PAY_METHOD_OPTIONS = [
 
 export default function Billing() {
   const navigate = useNavigate();
+  const { logo, setLogo } = useAssets();
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useMinLoading(true);
   const [payFilter, setPayFilter] = useState('all');
@@ -86,7 +88,7 @@ export default function Billing() {
     if (!selectedOrder) return;
     const amount = parseFloat(payAmount);
     if (!amount || amount <= 0) {
-      Swal.fire({ icon: 'warning', title: 'Invalid', text: 'Enter a valid amount.', confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'warning', title: 'Invalid', text: 'Enter a valid amount.', confirmButtonColor: '#78001d' });
       return;
     }
     setPaying(true);
@@ -100,50 +102,73 @@ export default function Billing() {
         Swal.fire({ icon: 'success', title: 'Payment Recorded', timer: 2000, showConfirmButton: false });
       }
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     } finally {
       setPaying(false);
     }
   };
 
-  const handleEmailReceipt = async (orderId: number) => {
-    if (!isEmailConfigured()) {
-      Swal.fire({ icon: 'warning', title: 'Email Not Configured', text: 'Go to Settings → Email to set up EmailJS first.', confirmButtonColor: '#f54927' });
-      return;
-    }
+  const handleEmailReceipt = async (orderId: number, prefillEmail?: string) => {
     const { value: toEmail } = await Swal.fire({
       title: 'Email Receipt',
       input: 'email',
       inputLabel: 'Patient email address',
+      inputValue: prefillEmail || '',
       inputPlaceholder: 'patient@example.com',
       showCancelButton: true,
-      confirmButtonColor: '#f54927',
+      confirmButtonColor: '#78001d',
       confirmButtonText: 'Send',
     });
     if (!toEmail) return;
     try {
-      const data = await getReceiptData(orderId);
-      await sendReceiptEmail(data, toEmail);
+      const [data, freshLogo] = await Promise.all([getReceiptData(orderId), getLogo().catch(() => null)]);
+      await sendReceiptEmail(data, toEmail, freshLogo);
       Swal.fire({ icon: 'success', title: 'Receipt Sent', text: `Receipt emailed to ${toEmail}`, timer: 2500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Failed to Send', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Failed to Send', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+    }
+  };
+
+  const handleSendReminder = async (o: OrderSummary) => {
+    if (!o.patient_email) {
+      Swal.fire({ icon: 'warning', title: 'No Email', text: 'This patient has no registered email address.', confirmButtonColor: '#78001d' });
+      return;
+    }
+    const orderDate = new Date(o.order_date);
+    const daysOutstanding = Math.floor((Date.now() - orderDate.getTime()) / 86400000);
+    try {
+      await sendBalanceReminderEmail({
+        patient_name: o.patient_name,
+        patient_ref: o.patient_ref,
+        order_number: o.order_number,
+        order_date: o.order_date,
+        total_amount: o.total_amount,
+        amount_paid: o.amount_paid,
+        balance: o.balance,
+        days_outstanding: daysOutstanding,
+        tests: [],
+      }, o.patient_email);
+      Swal.fire({ icon: 'success', title: 'Reminder Sent', text: `Balance reminder sent to ${o.patient_email}`, timer: 2000, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Failed', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     }
   };
 
   const handlePrintReceipt = async (orderId: number) => {
     try {
-      const data = await getReceiptData(orderId);
+      const [data, freshLogo] = await Promise.all([getReceiptData(orderId), getLogo().catch(() => null)]);
+      if (freshLogo && freshLogo !== logo) setLogo(freshLogo);
       flushSync(() => setReceipt(data));
       triggerPrint();
       window.addEventListener('afterprint', () => setReceipt(null), { once: true });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     }
   };
 
   return (
     <div>
-      {receipt && <div className="print-container"><PrintReceipt data={receipt} /></div>}
+      {receipt && <div className="print-container"><PrintReceipt data={receipt} logo={logo} /></div>}
 
       <div className="no-print">
         <div className="page-header">
@@ -249,9 +274,18 @@ export default function Billing() {
                                 <button className="btn btn-secondary btn-sm" onClick={() => handlePrintReceipt(o.id)}>
                                   <Printer size={12} /> Receipt
                                 </button>
-                                <button className="btn btn-secondary btn-sm" onClick={() => handleEmailReceipt(o.id)}>
-                                  <Mail size={12} /> Email
-                                </button>
+                                {o.patient_email && (
+                                  <button className="btn btn-secondary btn-sm" onClick={() => handleEmailReceipt(o.id, o.patient_email)}
+                                    title={`Email receipt to ${o.patient_email}`}>
+                                    <Mail size={12} /> Email
+                                  </button>
+                                )}
+                                {o.balance > 0 && o.patient_email && (
+                                  <button className="btn btn-ghost btn-sm" onClick={() => handleSendReminder(o)}
+                                    title="Send balance reminder email" style={{ color: 'var(--error)', borderColor: 'var(--error)' }}>
+                                    <Mail size={12} /> Remind
+                                  </button>
+                                )}
                               </>
                             )}
                           </div>

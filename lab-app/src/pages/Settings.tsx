@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useMinLoading } from '../hooks/useMinLoading';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -7,7 +7,8 @@ import {
   getTestCategories, getTests, updateTestPrice,
   createTestCategory, deleteTestCategory, renameTestCategory, createTest, deleteTest,
   changePassword, updateProfile, getReferenceRanges, saveReferenceRange, deleteReferenceRange, backupDatabase,
-  getAuditLogs, restoreDatabase, saveSmtpConfig, getSmtpConfig, sendEmailSmtp,
+  getAuditLogs, restoreDatabase, saveSmtpConfig, getSmtpConfig, sendEmailSmtp, backupDatabaseTo,
+  saveLabInfo, getLabInfo,
 } from '../lib/api';
 import type { UserInfo, TestItem, TestCategory, ReferenceRange, AuditLog } from '../types';
 import Modal from '../components/Modal';
@@ -16,12 +17,17 @@ import Pagination from '../components/Pagination';
 import PageLoader from '../components/PageLoader';
 import Swal from 'sweetalert2';
 import { fmtUGX } from '../lib/currency';
-import { Lock, Unlock, Plus, Trash2, Pencil, Database, Save } from 'lucide-react';
+import { Lock, Unlock, Plus, Trash2, Pencil, Database, Save, Image, FolderOpen } from 'lucide-react';
+import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
+import ImageUpload from '../components/ImageUpload';
+import { saveLogo, deleteLogo, saveProfilePhoto } from '../lib/api';
+import { useAssets } from '../contexts/AssetsContext';
 
 export default function Settings() {
   const { user, setUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState<'profile' | 'users' | 'tests' | 'email' | 'printing' | 'ranges' | 'backup' | 'audit'>('profile');
+  const { logo, setLogo } = useAssets();
+  const [activeTab, setActiveTab] = useState<'profile' | 'branding' | 'lab-info' | 'users' | 'tests' | 'email' | 'printing' | 'ranges' | 'backup' | 'audit'>('profile');
 
   // Profile / Password
   const [profileFullName, setProfileFullName] = useState(() => user?.full_name || '');
@@ -29,6 +35,10 @@ export default function Settings() {
   const [profileTitle, setProfileTitle] = useState(() => user?.title || '');
   const [profileEmail, setProfileEmail] = useState(() => user?.email || '');
   const [profileSaving, setProfileSaving] = useState(false);
+  const [logoSaving, setLogoSaving] = useState(false);
+  const [photoSaving, setPhotoSaving] = useState(false);
+  const [pendingLogo, setPendingLogo] = useState<string | null | undefined>(undefined); // undefined = not changed
+  const [pendingPhoto, setPendingPhoto] = useState<string | null | undefined>(undefined);
   const [oldPw, setOldPw] = useState('');
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
@@ -49,13 +59,6 @@ export default function Settings() {
   const [editPrices, setEditPrices] = useState<Record<number, string>>({});
   const [priceSaving, setPriceSaving] = useState<number | null>(null);
 
-  // EmailJS
-  const [ejServiceId, setEjServiceId] = useState(() => localStorage.getItem('emailjs_service_id') || '');
-  const [ejTemplateId, setEjTemplateId] = useState(() => localStorage.getItem('emailjs_template_id') || '');
-  const [ejResultsTplId, setEjResultsTplId] = useState(() => localStorage.getItem('emailjs_results_template_id') || '');
-  const [ejReceiptTplId, setEjReceiptTplId] = useState(() => localStorage.getItem('emailjs_receipt_template_id') || '');
-  const [ejPublicKey, setEjPublicKey] = useState(() => localStorage.getItem('emailjs_public_key') || '');
-
   // SMTP
   const [smtpHost, setSmtpHost] = useState('');
   const [smtpPort, setSmtpPort] = useState('587');
@@ -65,8 +68,19 @@ export default function Settings() {
   const [smtpFromEmail, setSmtpFromEmail] = useState('');
   const [smtpUseTls, setSmtpUseTls] = useState(true);
   const [smtpLoading, setSmtpLoading] = useState(false);
+  const [smtpConfigLoading, setSmtpConfigLoading] = useState(false);
   const [smtpTesting, setSmtpTesting] = useState(false);
   const [smtpTestEmail, setSmtpTestEmail] = useState('');
+
+  // Lab Info
+  const [labName, setLabName] = useState('');
+  const [labTagline, setLabTagline] = useState('');
+  const [labAddress, setLabAddress] = useState('');
+  const [labPhone, setLabPhone] = useState('');
+  const [labEmail, setLabEmail] = useState('');
+  const [labWebsite, setLabWebsite] = useState('');
+  const [labInfoLoading, setLabInfoLoading] = useState(false);
+  const [labInfoSaving, setLabInfoSaving] = useState(false);
 
   // Printer settings
   const [paperSize, setPaperSize] = useState(() => localStorage.getItem('printer_paper_size') || '80mm');
@@ -85,6 +99,7 @@ export default function Settings() {
   // Backup / Restore
   const [backingUp, setBackingUp] = useState(false);
   const [lastBackupPath, setLastBackupPath] = useState('');
+  const [backupDestDir, setBackupDestDir] = useState(() => localStorage.getItem('backup_dest_dir') || '');
   const [restoring, setRestoring] = useState(false);
 
   // Audit Log
@@ -123,7 +138,19 @@ export default function Settings() {
       setLoadingAudit(true);
       getAuditLogs(200, 0).then(setAuditLogs).finally(() => setLoadingAudit(false));
     }
+    if (activeTab === 'lab-info') {
+      setLabInfoLoading(true);
+      getLabInfo().then(info => {
+        setLabName(info.name);
+        setLabTagline(info.tagline);
+        setLabAddress(info.address);
+        setLabPhone(info.phone);
+        setLabEmail(info.email);
+        setLabWebsite(info.website);
+      }).catch(() => {}).finally(() => setLabInfoLoading(false));
+    }
     if (activeTab === 'email' && user?.role === 'admin') {
+      setSmtpConfigLoading(true);
       getSmtpConfig().then(cfg => {
         if (cfg) {
           setSmtpHost(cfg.host);
@@ -133,13 +160,48 @@ export default function Settings() {
           setSmtpFromEmail(cfg.from_email);
           setSmtpUseTls(cfg.use_tls);
         }
-      }).catch(() => {});
+      }).catch(() => {}).finally(() => setSmtpConfigLoading(false));
     }
   }, [activeTab, user]);
 
+  const handleSaveLogo = async () => {
+    if (pendingLogo === undefined) return;
+    setLogoSaving(true);
+    try {
+      if (pendingLogo === null) {
+        await deleteLogo();
+        setLogo(null);
+      } else {
+        await saveLogo(pendingLogo);
+        setLogo(pendingLogo);
+      }
+      setPendingLogo(undefined);
+      Swal.fire({ icon: 'success', title: 'Logo Saved', timer: 1500, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+    } finally {
+      setLogoSaving(false);
+    }
+  };
+
+  const handleSavePhoto = async () => {
+    if (pendingPhoto === undefined) return;
+    setPhotoSaving(true);
+    try {
+      const updated = await saveProfilePhoto(pendingPhoto ?? '');
+      setUser(updated);
+      setPendingPhoto(undefined);
+      Swal.fire({ icon: 'success', title: 'Photo Saved', timer: 1500, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+    } finally {
+      setPhotoSaving(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!profileFullName.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Required', text: 'Full name is required.', confirmButtonColor: '#f54927' }); return;
+      Swal.fire({ icon: 'warning', title: 'Required', text: 'Full name is required.', confirmButtonColor: '#78001d' }); return;
     }
     setProfileSaving(true);
     try {
@@ -147,7 +209,7 @@ export default function Settings() {
       setUser(updated);
       Swal.fire({ icon: 'success', title: 'Profile Updated', timer: 2000, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     } finally {
       setProfileSaving(false);
     }
@@ -155,13 +217,13 @@ export default function Settings() {
 
   const handleChangePassword = async () => {
     if (!oldPw || !newPw || !confirmPw) {
-      Swal.fire({ icon: 'warning', title: 'Required', text: 'All password fields are required.', confirmButtonColor: '#f54927' }); return;
+      Swal.fire({ icon: 'warning', title: 'Required', text: 'All password fields are required.', confirmButtonColor: '#78001d' }); return;
     }
     if (newPw !== confirmPw) {
-      Swal.fire({ icon: 'warning', title: 'Mismatch', text: 'New passwords do not match.', confirmButtonColor: '#f54927' }); return;
+      Swal.fire({ icon: 'warning', title: 'Mismatch', text: 'New passwords do not match.', confirmButtonColor: '#78001d' }); return;
     }
     if (newPw.length < 6) {
-      Swal.fire({ icon: 'warning', title: 'Too Short', text: 'Password must be at least 6 characters.', confirmButtonColor: '#f54927' }); return;
+      Swal.fire({ icon: 'warning', title: 'Too Short', text: 'Password must be at least 6 characters.', confirmButtonColor: '#78001d' }); return;
     }
     setPwSaving(true);
     try {
@@ -169,7 +231,7 @@ export default function Settings() {
       setOldPw(''); setNewPw(''); setConfirmPw('');
       Swal.fire({ icon: 'success', title: 'Password Changed', timer: 2000, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     } finally {
       setPwSaving(false);
     }
@@ -177,7 +239,7 @@ export default function Settings() {
 
   const handleCreateUser = async () => {
     if (!userForm.username || !userForm.full_name || !userForm.password) {
-      Swal.fire({ icon: 'warning', title: 'Required', text: 'Name, username, and password are required.', confirmButtonColor: '#f54927' }); return;
+      Swal.fire({ icon: 'warning', title: 'Required', text: 'Name, username, and password are required.', confirmButtonColor: '#78001d' }); return;
     }
     setUserSaving(true);
     try {
@@ -193,7 +255,7 @@ export default function Settings() {
       setUserForm({ username: '', full_name: '', email: '', password: '', role: 'lab_tech' });
       Swal.fire({ icon: 'success', title: 'User Created', timer: 2000, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     } finally {
       setUserSaving(false);
     }
@@ -211,7 +273,7 @@ export default function Settings() {
       setUsers(us => us.filter(u => u.id !== uid));
       Swal.fire({ icon: 'success', title: 'Deleted', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     }
   };
 
@@ -221,7 +283,7 @@ export default function Settings() {
       setUsers(us => us.map(u => u.id === uid ? { ...u, failed_attempts: 0, locked_until: undefined } : u));
       Swal.fire({ icon: 'success', title: `${uname} unlocked`, timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     }
   };
 
@@ -232,7 +294,7 @@ export default function Settings() {
       inputValue: currentEmail,
       inputPlaceholder: 'user@example.com',
       showCancelButton: true,
-      confirmButtonColor: '#f54927',
+      confirmButtonColor: '#78001d',
     });
     if (email === undefined) return;
     try {
@@ -240,7 +302,7 @@ export default function Settings() {
       setUsers(us => us.map(u => u.id === uid ? { ...u, email: email || undefined } : u));
       Swal.fire({ icon: 'success', title: 'Email Updated', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     }
   };
 
@@ -271,7 +333,7 @@ export default function Settings() {
   const handleSaveRange = async () => {
     if (!selectedRefTestId) return;
     if (!rangeForm.unit || !rangeForm.reference_range) {
-      Swal.fire({ icon: 'warning', title: 'Required', text: 'Unit and reference range are required.', confirmButtonColor: '#f54927' }); return;
+      Swal.fire({ icon: 'warning', title: 'Required', text: 'Unit and reference range are required.', confirmButtonColor: '#78001d' }); return;
     }
     setRangeSaving(true);
     try {
@@ -288,7 +350,7 @@ export default function Settings() {
       await loadRangesForTest(Number(selectedRefTestId));
       Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     } finally {
       setRangeSaving(false);
     }
@@ -301,18 +363,40 @@ export default function Settings() {
       await deleteReferenceRange(r.id);
       setRefRanges(rs => rs.filter(x => x.id !== r.id));
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+    }
+  };
+
+  const handlePickBackupFolder = async () => {
+    try {
+      const selected = await dialogOpen({ directory: true, multiple: false, title: 'Select Backup Folder' });
+      if (selected && typeof selected === 'string') {
+        setBackupDestDir(selected);
+        localStorage.setItem('backup_dest_dir', selected);
+      }
+    } catch (err) {
+      console.error('Folder picker error:', err);
     }
   };
 
   const handleBackup = async () => {
     setBackingUp(true);
     try {
-      const path = await backupDatabase();
+      let path: string;
+      if (backupDestDir.trim()) {
+        localStorage.setItem('backup_dest_dir', backupDestDir.trim());
+        path = await backupDatabaseTo(backupDestDir.trim());
+      } else {
+        path = await backupDatabase();
+      }
       setLastBackupPath(path);
-      Swal.fire({ icon: 'success', title: 'Backup Created', html: `<div style="font-size:12px;word-break:break-all;margin-top:8px;">${path}</div>`, confirmButtonColor: '#f54927' });
+      Swal.fire({
+        icon: 'success', title: 'Backup Created',
+        html: `<div style="font-size:12px;word-break:break-all;margin-top:8px;font-family:monospace">${path}</div>`,
+        confirmButtonColor: '#78001d',
+      });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Backup Failed', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Backup Failed', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     } finally {
       setBackingUp(false);
     }
@@ -340,10 +424,10 @@ export default function Settings() {
         Swal.fire({
           icon: 'success', title: 'Restore Staged',
           text: 'The database restore will be applied the next time the app starts. Please restart the app now.',
-          confirmButtonColor: '#f54927',
+          confirmButtonColor: '#78001d',
         });
       } catch (err) {
-        Swal.fire({ icon: 'error', title: 'Restore Failed', text: String(err), confirmButtonColor: '#f54927' });
+        Swal.fire({ icon: 'error', title: 'Restore Failed', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
       } finally {
         setRestoring(false);
       }
@@ -354,7 +438,7 @@ export default function Settings() {
   const handleSavePrice = async (testId: number) => {
     const price = parseInt(editPrices[testId]);
     if (isNaN(price) || price < 0) {
-      Swal.fire({ icon: 'warning', title: 'Invalid Price', confirmButtonColor: '#f54927' }); return;
+      Swal.fire({ icon: 'warning', title: 'Invalid Price', confirmButtonColor: '#78001d' }); return;
     }
     setPriceSaving(testId);
     try {
@@ -362,7 +446,7 @@ export default function Settings() {
       setTests(ts => ts.map(t => t.id === testId ? { ...t, price } : t));
       Swal.fire({ icon: 'success', title: 'Price Updated', timer: 1200, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     } finally {
       setPriceSaving(null);
     }
@@ -371,7 +455,7 @@ export default function Settings() {
   const handleSaveAllPrices = async () => {
     const changed = tests.filter(t => parseInt(editPrices[t.id]) !== t.price && !isNaN(parseInt(editPrices[t.id])));
     if (changed.length === 0) {
-      Swal.fire({ icon: 'info', title: 'No Changes', text: 'No prices have been modified.', confirmButtonColor: '#f54927' }); return;
+      Swal.fire({ icon: 'info', title: 'No Changes', text: 'No prices have been modified.', confirmButtonColor: '#78001d' }); return;
     }
     setPriceSaving(-1);
     try {
@@ -379,7 +463,7 @@ export default function Settings() {
       setTests(ts => ts.map(t => ({ ...t, price: parseInt(editPrices[t.id]) ?? t.price })));
       Swal.fire({ icon: 'success', title: `${changed.length} Price(s) Updated`, timer: 1800, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     } finally {
       setPriceSaving(null);
     }
@@ -391,7 +475,7 @@ export default function Settings() {
       input: 'text',
       inputPlaceholder: 'e.g. Complete Blood Count',
       showCancelButton: true,
-      confirmButtonColor: '#f54927',
+      confirmButtonColor: '#78001d',
       inputValidator: v => !v.trim() ? 'Category name is required' : null,
     });
     if (!name) return;
@@ -400,7 +484,7 @@ export default function Settings() {
       setCategories(cs => [...cs, cat]);
       Swal.fire({ icon: 'success', title: 'Category Added', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     }
   };
 
@@ -410,7 +494,7 @@ export default function Settings() {
       input: 'text',
       inputValue: currentName,
       showCancelButton: true,
-      confirmButtonColor: '#f54927',
+      confirmButtonColor: '#78001d',
       inputValidator: v => !v.trim() ? 'Name is required' : null,
     });
     if (!name || name.trim() === currentName) return;
@@ -420,7 +504,7 @@ export default function Settings() {
       setTests(ts => ts.map(t => t.category_id === catId ? { ...t, category_name: name.trim() } : t));
       Swal.fire({ icon: 'success', title: 'Category Renamed', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     }
   };
 
@@ -435,7 +519,7 @@ export default function Settings() {
       setCategories(cs => cs.filter(c => c.id !== catId));
       Swal.fire({ icon: 'success', title: 'Category Deleted', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     }
   };
 
@@ -448,7 +532,7 @@ export default function Settings() {
       `,
       focusConfirm: false,
       showCancelButton: true,
-      confirmButtonColor: '#f54927',
+      confirmButtonColor: '#78001d',
       preConfirm: () => {
         const name = (document.getElementById('swal-test-name') as HTMLInputElement).value.trim();
         const price = parseInt((document.getElementById('swal-test-price') as HTMLInputElement).value);
@@ -464,7 +548,7 @@ export default function Settings() {
       setEditPrices(p => ({ ...p, [newTest.id]: newTest.price.toString() }));
       Swal.fire({ icon: 'success', title: 'Test Added', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     }
   };
 
@@ -480,13 +564,25 @@ export default function Settings() {
       setTests(ts => ts.filter(t => t.id !== testId));
       Swal.fire({ icon: 'success', title: 'Test Deleted', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+    }
+  };
+
+  const handleSaveLabInfo = async () => {
+    setLabInfoSaving(true);
+    try {
+      await saveLabInfo({ name: labName.trim(), tagline: labTagline.trim(), address: labAddress.trim(), phone: labPhone.trim(), email: labEmail.trim(), website: labWebsite.trim() });
+      Swal.fire({ icon: 'success', title: 'Lab Info Saved', timer: 1500, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+    } finally {
+      setLabInfoSaving(false);
     }
   };
 
   const handleSaveSmtp = async () => {
     if (!smtpHost) {
-      Swal.fire({ icon: 'warning', title: 'Required', text: 'SMTP host is required.', confirmButtonColor: '#f54927' }); return;
+      Swal.fire({ icon: 'warning', title: 'Required', text: 'SMTP host is required.', confirmButtonColor: '#78001d' }); return;
     }
     setSmtpLoading(true);
     try {
@@ -502,7 +598,7 @@ export default function Settings() {
       setSmtpPass('');
       Swal.fire({ icon: 'success', title: 'SMTP Config Saved', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     } finally {
       setSmtpLoading(false);
     }
@@ -510,7 +606,7 @@ export default function Settings() {
 
   const handleTestSmtp = async () => {
     if (!smtpTestEmail) {
-      Swal.fire({ icon: 'warning', title: 'Required', text: 'Enter a test email address.', confirmButtonColor: '#f54927' }); return;
+      Swal.fire({ icon: 'warning', title: 'Required', text: 'Enter a test email address.', confirmButtonColor: '#78001d' }); return;
     }
     setSmtpTesting(true);
     try {
@@ -519,21 +615,12 @@ export default function Settings() {
         'NDL Lab System — SMTP Test',
         '<p>This is a test email from <strong>Noble Diagnostic Laboratory</strong> system.</p><p>SMTP is configured correctly.</p>',
       );
-      Swal.fire({ icon: 'success', title: 'Test Email Sent', text: `Check ${smtpTestEmail}`, confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'success', title: 'Test Email Sent', text: `Check ${smtpTestEmail}`, confirmButtonColor: '#78001d' });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Send Failed', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Send Failed', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     } finally {
       setSmtpTesting(false);
     }
-  };
-
-  const saveEmailJsConfig = () => {
-    localStorage.setItem('emailjs_service_id', ejServiceId.trim());
-    localStorage.setItem('emailjs_template_id', ejTemplateId.trim());
-    localStorage.setItem('emailjs_results_template_id', ejResultsTplId.trim());
-    localStorage.setItem('emailjs_receipt_template_id', ejReceiptTplId.trim());
-    localStorage.setItem('emailjs_public_key', ejPublicKey.trim());
-    Swal.fire({ icon: 'success', title: 'EmailJS Config Saved', timer: 1500, showConfirmButton: false });
   };
 
   const savePrinterSettings = () => {
@@ -550,6 +637,8 @@ export default function Settings() {
 
   const TABS = [
     { key: 'profile', label: 'Profile' },
+    { key: 'lab-info', label: 'Lab Info' },
+    { key: 'branding', label: 'Branding' },
     { key: 'printing', label: 'Printing' },
     ...(user?.role === 'admin' ? [
       { key: 'users', label: 'User Management' },
@@ -563,9 +652,19 @@ export default function Settings() {
 
   return (
     <div>
-      <div className="page-header"><div><h1>Settings</h1></div></div>
+      <div className="page-header">
+        <div>
+          <h1>Account Settings</h1>
+          <p>Manage laboratory credentials, security preferences, and system configuration.</p>
+        </div>
+      </div>
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid var(--border-color)', paddingBottom: 0, flexWrap: 'wrap' }}>
+      {/* Tab navigation — clinical style */}
+      <div style={{
+        display: 'flex', gap: 0,
+        borderBottom: '1px solid var(--outline-variant)',
+        marginBottom: 24, overflowX: 'auto',
+      }}>
         {TABS.map(tab => (
           <button key={tab.key} onClick={() => {
             setActiveTab(tab.key);
@@ -574,11 +673,18 @@ export default function Settings() {
             if (tab.key === 'audit') setLoadingAudit(true);
           }}
             style={{
-              background: 'none', border: 'none', padding: '8px 18px',
-              fontWeight: activeTab === tab.key ? 700 : 500,
-              color: activeTab === tab.key ? 'var(--primary-color)' : 'var(--text-secondary)',
-              borderBottom: activeTab === tab.key ? '2px solid var(--primary-color)' : '2px solid transparent',
-              marginBottom: -2, cursor: 'pointer', fontSize: 13.5, transition: 'all 0.15s',
+              background: 'none', border: 'none',
+              padding: '10px 20px',
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              fontSize: 11,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              color: activeTab === tab.key ? 'var(--primary)' : 'var(--on-surface-variant)',
+              borderBottom: activeTab === tab.key ? '2px solid var(--primary)' : '2px solid transparent',
+              marginBottom: -1, cursor: 'pointer',
+              transition: 'all 0.15s',
+              whiteSpace: 'nowrap',
             }}>
             {tab.label}
           </button>
@@ -586,27 +692,91 @@ export default function Settings() {
       </div>
 
       {activeTab === 'profile' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
-          {/* Avatar + identity summary */}
-          <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 60, height: 60, background: 'var(--primary-color)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 22, fontWeight: 800, flexShrink: 0 }}>
-              {(profileFullName || user?.full_name || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20, maxWidth: 840 }}>
+          {/* Profile info card */}
+          <div className="card">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+                  background: user?.photo ? 'transparent' : 'var(--primary)',
+                  border: '2px solid var(--outline-variant)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontSize: 18, fontWeight: 800,
+                }}>
+                  {user?.photo
+                    ? <img src={user.photo} alt={user?.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : (profileFullName || user?.full_name || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>{user?.full_name}</div>
+                  <div style={{ color: 'var(--on-surface-variant)', fontSize: 12 }}>@{user?.username}</div>
+                  {user?.title && <div style={{ fontSize: 11, color: 'var(--on-surface-variant)', marginTop: 1 }}>{user.title}</div>}
+                  <span className={`badge badge-${user?.role}`} style={{ marginTop: 4 }}>{user?.role}</span>
+                </div>
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={handleSaveProfile} disabled={profileSaving}>
+                {profileSaving ? <><span className="spinner" style={{ width: 13, height: 13 }} /> Saving…</> : 'Save Changes'}
+              </button>
             </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 16 }}>{user?.full_name}</div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>@{user?.username}</div>
-              {user?.title && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{user.title}</div>}
-              <span className={`badge badge-${user?.role}`} style={{ marginTop: 4 }}>{user?.role}</span>
+            <div style={{ borderTop: '1px solid var(--outline-variant)', paddingTop: 16 }}>
+              <div className="card-header" style={{ marginBottom: 12 }}>
+                <div className="card-title" style={{ fontSize: 14 }}>Profile Information</div>
+              </div>
+              <div className="form-row">
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Full Name <span className="required">*</span></label>
+                  <input className="form-control" value={profileFullName} onChange={e => setProfileFullName(e.target.value)} placeholder="Your full name" />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Title / Position</label>
+                  <input className="form-control" value={profileTitle} onChange={e => setProfileTitle(e.target.value)} placeholder="e.g. Senior Lab Technician" />
+                </div>
+              </div>
+              <div className="form-row mt-16">
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Phone</label>
+                  <input className="form-control" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} placeholder="e.g. 0712 345 678" />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Email</label>
+                  <input className="form-control" type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} placeholder="you@example.com" />
+                </div>
+              </div>
+              <p style={{ marginTop: 6, fontSize: 11, color: 'var(--on-surface-variant)' }}>
+                Username (@{user?.username}) cannot be changed.
+              </p>
             </div>
+          </div>
+
+          {/* Profile Photo */}
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Image size={15} /> Profile Photo</div>
+            </div>
+            <ImageUpload
+              value={pendingPhoto !== undefined ? pendingPhoto : (user?.photo ?? null)}
+              onChange={v => setPendingPhoto(v)}
+              maxKB={100}
+              label=""
+              hint="Recommended: square image, at least 200×200px"
+              shape="circle"
+              previewHeight={80}
+            />
+            {pendingPhoto !== undefined && (
+              <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }} onClick={handleSavePhoto} disabled={photoSaving}>
+                {photoSaving ? <><span className="spinner" style={{ width: 12, height: 12 }} /> Saving…</> : 'Save Photo'}
+              </button>
+            )}
           </div>
 
           {/* Appearance */}
           <div className="card">
             <div className="card-header"><div className="card-title">Appearance</div></div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
               <div>
-                <div style={{ fontWeight: 600, fontSize: 13.5 }}>Theme</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Currently: {theme === 'dark' ? 'Dark' : 'Light'} mode</div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>Theme</div>
+                <div style={{ color: 'var(--on-surface-variant)', fontSize: 12 }}>Currently: {theme === 'dark' ? 'Dark' : 'Light'} mode</div>
               </div>
               <button className="btn btn-secondary" onClick={toggleTheme}>
                 {theme === 'light' ? 'Switch to Dark' : 'Switch to Light'}
@@ -614,39 +784,8 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Edit Profile */}
-          <div className="card" style={{ gridColumn: '1/-1', maxWidth: 520 }}>
-            <div className="card-header"><div className="card-title">Edit Profile</div></div>
-            <div className="form-row">
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Full Name <span className="required">*</span></label>
-                <input className="form-control" value={profileFullName} onChange={e => setProfileFullName(e.target.value)} placeholder="Your full name" />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Title / Position</label>
-                <input className="form-control" value={profileTitle} onChange={e => setProfileTitle(e.target.value)} placeholder="e.g. Senior Lab Technician" />
-              </div>
-            </div>
-            <div className="form-row mt-16">
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Phone</label>
-                <input className="form-control" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} placeholder="e.g. 0712 345 678" />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Email</label>
-                <input className="form-control" type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} placeholder="you@example.com" />
-              </div>
-            </div>
-            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--text-secondary)' }}>
-              Username (@{user?.username}) cannot be changed.
-            </div>
-            <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleSaveProfile} disabled={profileSaving}>
-              {profileSaving ? <><span className="spinner" style={{ width: 14, height: 14 }} /> Saving...</> : 'Save Profile'}
-            </button>
-          </div>
-
           {/* Change Password */}
-          <div className="card" style={{ gridColumn: '1/-1', maxWidth: 480 }}>
+          <div className="card">
             <div className="card-header"><div className="card-title">Change Password</div></div>
             <div className="form-group">
               <label className="form-label">Current Password</label>
@@ -661,8 +800,105 @@ export default function Settings() {
               <input className="form-control" type="password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} />
             </div>
             <button className="btn btn-primary" onClick={handleChangePassword} disabled={pwSaving}>
-              {pwSaving ? <><span className="spinner" style={{ width: 14, height: 14 }} /> Saving...</> : 'Update Password'}
+              {pwSaving ? <><span className="spinner" style={{ width: 14, height: 14 }} /> Saving…</> : 'Update Password'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'lab-info' && (
+        <div style={{ maxWidth: 560 }}>
+          {labInfoLoading ? <PageLoader label="Loading lab info…" /> : (
+            <div className="card">
+              <div className="card-title">Lab Information</div>
+              <div className="card-subtitle">This information appears on all printed receipts and results reports.</div>
+              <div style={{ display: 'grid', gap: 14, marginTop: 16 }}>
+                <div className="form-group">
+                  <label className="form-label">Lab Name</label>
+                  <input className="form-control" placeholder="e.g. Noble Diagnostic Laboratory" value={labName} onChange={e => setLabName(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Tagline / Motto</label>
+                  <input className="form-control" placeholder="e.g. Professionalism Is Part Of Us" value={labTagline} onChange={e => setLabTagline(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Address</label>
+                  <textarea className="form-control" rows={2} placeholder="e.g. Maina House, Plot 31A Kiwafu Road, Entebbe, Uganda" value={labAddress} onChange={e => setLabAddress(e.target.value)} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Phone</label>
+                    <input className="form-control" placeholder="e.g. +256 706947101" value={labPhone} onChange={e => setLabPhone(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Email</label>
+                    <input className="form-control" type="email" placeholder="e.g. lab@example.com" value={labEmail} onChange={e => setLabEmail(e.target.value)} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Website</label>
+                  <input className="form-control" placeholder="e.g. www.ndllab.com" value={labWebsite} onChange={e => setLabWebsite(e.target.value)} />
+                </div>
+                <button className="btn btn-primary" onClick={handleSaveLabInfo} disabled={labInfoSaving}>
+                  {labInfoSaving ? <><span className="spinner" style={{ width: 14, height: 14 }} /> Saving…</> : 'Save Lab Info'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'branding' && (
+        <div style={{ maxWidth: 560 }}>
+          <div className="card">
+            <div className="card-header">
+              <div>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Image size={15} /> Laboratory Logo
+                </div>
+                <div className="card-subtitle">
+                  Appears on printed lab reports and payment receipts. PNG with transparency is supported.
+                </div>
+              </div>
+            </div>
+
+            <ImageUpload
+              value={pendingLogo !== undefined ? pendingLogo : logo}
+              onChange={v => setPendingLogo(v)}
+              maxKB={50}
+              label="Upload Logo"
+              hint="Ideal size: 300×100px or similar landscape format"
+              shape="rect"
+              previewHeight={80}
+            />
+
+            {pendingLogo !== undefined && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <button className="btn btn-primary" onClick={handleSaveLogo} disabled={logoSaving}>
+                  {logoSaving ? <><span className="spinner" style={{ width: 13, height: 13 }} /> Saving…</> : 'Save Logo'}
+                </button>
+                <button className="btn btn-ghost" onClick={() => setPendingLogo(undefined)}>
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            {logo && pendingLogo === undefined && (
+              <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--surface-container-low)', borderRadius: 'var(--radius)', border: '1px solid var(--outline-variant)', fontSize: 12, color: 'var(--on-surface-variant)' }}>
+                ✓ Logo is active and will appear on all printed reports and receipts.
+              </div>
+            )}
+          </div>
+
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="card-header"><div className="card-title">Logo Display Tips</div></div>
+            <ul style={{ fontSize: 12, color: 'var(--on-surface-variant)', paddingLeft: 16, lineHeight: 2, margin: 0 }}>
+              <li><strong>PNG</strong> — preserves transparency; ideal for logos on white/colored backgrounds.</li>
+              <li><strong>JPEG</strong> — smaller file size; best for photographic logos.</li>
+              <li>Recommended dimensions: <strong>300–500px wide</strong>, max 150px tall.</li>
+              <li>If the logo appears blurry, upload a higher-resolution source image.</li>
+              <li>Max file size after compression: <strong>50 KB</strong>.</li>
+            </ul>
           </div>
         </div>
       )}
@@ -859,49 +1095,13 @@ export default function Settings() {
       )}
 
       {activeTab === 'email' && user?.role === 'admin' && (
+        smtpConfigLoading ? <PageLoader label="Loading email configuration…" /> :
         <div style={{ maxWidth: 560 }}>
           <div className="card">
             <div className="card-header">
               <div>
-                <div className="card-title">EmailJS Configuration</div>
-                <div className="card-subtitle">Powers password reset, lab results, and receipt emails. Get credentials at emailjs.com.</div>
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Service ID</label>
-                <input className="form-control" placeholder="e.g. service_abc123"
-                  value={ejServiceId} onChange={e => setEjServiceId(e.target.value)} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Public Key</label>
-                <input className="form-control" placeholder="e.g. user_xxxxxxxx"
-                  value={ejPublicKey} onChange={e => setEjPublicKey(e.target.value)} />
-              </div>
-            </div>
-            <div className="form-group mt-16">
-              <label className="form-label">Password Reset Template ID</label>
-              <input className="form-control" placeholder="e.g. template_reset123"
-                value={ejTemplateId} onChange={e => setEjTemplateId(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Lab Results Template ID</label>
-              <input className="form-control" placeholder="e.g. template_results456"
-                value={ejResultsTplId} onChange={e => setEjResultsTplId(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Receipt Template ID</label>
-              <input className="form-control" placeholder="e.g. template_receipt789"
-                value={ejReceiptTplId} onChange={e => setEjReceiptTplId(e.target.value)} />
-            </div>
-            <button className="btn btn-primary" onClick={saveEmailJsConfig}>Save EmailJS Config</button>
-          </div>
-
-          <div className="card" style={{ marginTop: 16 }}>
-            <div className="card-header">
-              <div>
-                <div className="card-title">SMTP Configuration (Fallback)</div>
-                <div className="card-subtitle">Used automatically when EmailJS is not configured or fails. Works with Gmail, Outlook, or any SMTP server.</div>
+                <div className="card-title">SMTP Email Configuration</div>
+                <div className="card-subtitle">Sends lab results, receipts, and password reset codes via your SMTP server. Works with Gmail, Outlook, or any SMTP provider.</div>
               </div>
             </div>
             <div className="form-row">
@@ -967,64 +1167,29 @@ export default function Settings() {
           </div>
 
           <div className="card" style={{ marginTop: 16 }}>
-            <div className="card-header"><div className="card-title">Template Variables Reference</div></div>
-            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>
-              Use these variables inside your EmailJS templates. Each template only needs its own set.
+            <div className="card-header"><div className="card-title">Automated Email Templates</div></div>
+            <p style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginBottom: 12 }}>
+              The system sends beautifully branded HTML emails via your SMTP server for the following events:
             </p>
-
             {[
-              {
-                title: 'Password Reset',
-                vars: [
-                  ['{{to_email}}', 'Recipient email'],
-                  ['{{identifier}}', 'Username or email entered'],
-                  ['{{reset_code}}', '6-digit reset code'],
-                ],
-              },
-              {
-                title: 'Lab Results',
-                vars: [
-                  ['{{to_email}}', 'Recipient email'],
-                  ['{{patient_name}}', 'Full name of patient'],
-                  ['{{patient_ref}}', 'Patient ID (e.g. NDL-0001)'],
-                  ['{{order_number}}', 'Order number'],
-                  ['{{result_date}}', 'Date results were recorded'],
-                  ['{{results_html}}', 'HTML table of all test results'],
-                  ['{{lab_name}}', 'Noble Diagnostic Laboratory'],
-                  ['{{lab_phone}}', 'Lab phone numbers'],
-                ],
-              },
-              {
-                title: 'Receipt / Invoice',
-                vars: [
-                  ['{{to_email}}', 'Recipient email'],
-                  ['{{patient_name}}', 'Full name of patient'],
-                  ['{{order_number}}', 'Order number'],
-                  ['{{payment_date}}', 'Date of payment'],
-                  ['{{payment_method}}', 'e.g. Cash, Mobile Money'],
-                  ['{{receipt_html}}', 'HTML table of tests + totals'],
-                  ['{{total_amount}}', 'Total billed amount'],
-                  ['{{amount_paid}}', 'Amount paid'],
-                  ['{{balance}}', 'Remaining balance'],
-                ],
-              },
-            ].map(section => (
-              <div key={section.title} style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary-color)', letterSpacing: 0.5, marginBottom: 6 }}>
-                  {section.title}
+              { icon: '🔐', title: 'Password Reset OTP', desc: 'Sends a 6-digit OTP code to the user\'s registered email when they request a password reset.' },
+              { icon: '🔬', title: 'Lab Results Report', desc: 'Sends a full HTML lab results report with test values, reference ranges, and status indicators.' },
+              { icon: '🧾', title: 'Payment Receipt', desc: 'Sends a payment receipt with test list, amounts, discount, and balance due.' },
+            ].map(t => (
+              <div key={t.title} style={{
+                display: 'flex', gap: 12, padding: '12px 0',
+                borderBottom: '1px solid var(--outline-variant)',
+              }}>
+                <span style={{ fontSize: 20, flexShrink: 0 }}>{t.icon}</span>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{t.title}</div>
+                  <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 2 }}>{t.desc}</div>
                 </div>
-                <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-                  <tbody>
-                    {section.vars.map(([v, d]) => (
-                      <tr key={v}>
-                        <td style={{ padding: '4px 8px', fontFamily: 'monospace', color: 'var(--primary-color)', whiteSpace: 'nowrap', width: 1 }}>{v}</td>
-                        <td style={{ padding: '4px 8px', color: 'var(--text-secondary)' }}>{d}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             ))}
+            <div style={{ marginTop: 12, padding: '10px 14px', background: 'color-mix(in srgb, var(--primary) 6%, transparent)', borderRadius: 'var(--radius)', border: '1px solid var(--outline-variant)', fontSize: 12, color: 'var(--on-surface-variant)' }}>
+              All emails use a <strong>branded NDL Lab</strong> template with the clinical crimson design. The From name and address are set above in SMTP Configuration.
+            </div>
           </div>
         </div>
       )}
@@ -1113,24 +1278,47 @@ export default function Settings() {
             <div className="card-header">
               <div>
                 <div className="card-title">Database Backup</div>
-                <div className="card-subtitle">Creates a timestamped copy of the SQLite database in the app data folder.</div>
+                <div className="card-subtitle">Creates a timestamped copy of the SQLite database at your chosen location.</div>
               </div>
             </div>
-            <div style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(245,73,39,0.06)', borderRadius: 'var(--radius)', fontSize: 13 }}>
-              Backups are saved automatically to: <br />
-              <span style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all', color: 'var(--text-secondary)' }}>
-                %APPDATA%\com.ndl.labsystem\backups\
-              </span>
+
+            {/* Backup destination */}
+            <div className="form-group">
+              <label className="form-label">Backup Destination Folder</label>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{
+                  flex: 1, padding: '7px 12px', border: '1px solid var(--outline-variant)',
+                  borderRadius: 'var(--radius)', background: 'var(--surface-container-low)',
+                  fontSize: 12, fontFamily: 'monospace', color: backupDestDir ? 'var(--on-surface)' : 'var(--on-surface-variant)',
+                  minHeight: 34, display: 'flex', alignItems: 'center',
+                  wordBreak: 'break-all',
+                }}>
+                  {backupDestDir || <span style={{ opacity: 0.6 }}>Default: %APPDATA%\com.ndl.labsystem\backups\</span>}
+                </div>
+                <button className="btn btn-secondary btn-sm" onClick={handlePickBackupFolder} style={{ flexShrink: 0 }}>
+                  <FolderOpen size={13} /> Browse…
+                </button>
+                {backupDestDir && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setBackupDestDir(''); localStorage.removeItem('backup_dest_dir'); }} style={{ flexShrink: 0 }}>
+                    Use Default
+                  </button>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--on-surface-variant)', marginTop: 5 }}>
+                Click <strong>Browse</strong> to choose where backups are saved. Leave as default to save in the app data folder.
+              </div>
             </div>
+
             {lastBackupPath && (
-              <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(16,185,129,0.08)', borderRadius: 'var(--radius)', border: '1px solid #10b981', fontSize: 12 }}>
-                <div style={{ fontWeight: 600, color: '#10b981', marginBottom: 4 }}>Last backup created:</div>
-                <div style={{ fontFamily: 'monospace', wordBreak: 'break-all', color: 'var(--text-secondary)' }}>{lastBackupPath}</div>
+              <div style={{ marginBottom: 12, padding: '10px 14px', background: 'var(--success-container)', borderRadius: 'var(--radius)', border: '1px solid rgba(20,108,52,0.2)', fontSize: 12 }}>
+                <div style={{ fontWeight: 600, color: 'var(--success)', marginBottom: 4 }}>Last backup saved to:</div>
+                <div style={{ fontFamily: 'monospace', wordBreak: 'break-all', color: 'var(--on-surface-variant)', fontSize: 11 }}>{lastBackupPath}</div>
               </div>
             )}
+
             <button className="btn btn-primary" onClick={handleBackup} disabled={backingUp} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               {backingUp
-                ? <><span className="spinner" style={{ width: 14, height: 14 }} /> Creating Backup...</>
+                ? <><span className="spinner" style={{ width: 14, height: 14 }} /> Creating Backup…</>
                 : <><Database size={14} /> Create Backup Now</>}
             </button>
           </div>

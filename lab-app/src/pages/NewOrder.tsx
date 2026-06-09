@@ -74,11 +74,11 @@ export default function NewOrder() {
 
   const handleSubmit = async () => {
     if (!selectedPatientId) {
-      Swal.fire({ icon: 'warning', title: 'No Patient', text: 'Please select a patient.', confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'warning', title: 'No Patient', text: 'Please select a patient.', confirmButtonColor: '#78001d' });
       return;
     }
     if (selectedTests.length === 0) {
-      Swal.fire({ icon: 'warning', title: 'No Tests', text: 'Please select at least one test.', confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'warning', title: 'No Tests', text: 'Please select at least one test.', confirmButtonColor: '#78001d' });
       return;
     }
     setSubmitting(true);
@@ -96,12 +96,12 @@ export default function NewOrder() {
         icon: 'success',
         title: 'Order Created',
         html: `Order <strong>${order.order_number}</strong> created for ${order.patient_name}.<br/>Total: <strong>${fmtUGX(total)}</strong>`,
-        confirmButtonColor: '#f54927',
+        confirmButtonColor: '#78001d',
         confirmButtonText: 'View Order',
       });
       navigate(`/orders/${order.id}`);
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     } finally {
       setSubmitting(false);
     }
@@ -121,7 +121,7 @@ export default function NewOrder() {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20, alignItems: 'start' }}>
+      <div className="new-order-grid">
         <div>
           {/* Patient Selection */}
           <div className="card" style={{ marginBottom: 20 }}>
@@ -146,7 +146,7 @@ export default function NewOrder() {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     borderBottom: '1px solid var(--border-color)',
-                    background: selectedPatientId === p.id ? 'rgba(245,73,39,0.08)' : 'transparent',
+                    background: selectedPatientId === p.id ? 'color-mix(in srgb, var(--primary) 8%, transparent)' : 'transparent',
                     transition: 'background 0.15s',
                   }}
                 >
@@ -161,7 +161,7 @@ export default function NewOrder() {
               ))}
             </div>
             {selectedPatient && (
-              <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(245,73,39,0.06)', borderRadius: 'var(--radius)', fontSize: 13 }}>
+              <div style={{ marginTop: 10, padding: '8px 12px', background: 'color-mix(in srgb, var(--primary) 6%, transparent)', borderRadius: 'var(--radius)', border: '1px solid var(--outline-variant)', fontSize: 13 }}>
                 Selected: <strong>{selectedPatient.full_name}</strong> ({selectedPatient.patient_id})
               </div>
             )}
@@ -190,7 +190,7 @@ export default function NewOrder() {
                           value={selected[test.id]?.price ?? test.price}
                           min={0}
                           step={1}
-                          onChange={e => { const v = parseInt(e.target.value) || 0; if (selected[test.id]) updatePrice(test.id, v); }}
+                          onChange={e => { const v = Math.max(0, parseInt(e.target.value) || 0); if (selected[test.id]) updatePrice(test.id, v); }}
                           disabled={!selected[test.id]}
                         />
                       </div>

@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useMinLoading } from '../hooks/useMinLoading';
 import { flushSync } from 'react-dom';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { FlaskConical, Printer, CheckCheck, ExternalLink, Mail, TrendingUp, X } from 'lucide-react';
-import { getOrders, getOrder, updateResult, markResultsComplete, getResultsReport, getAutofillForTest, getResultHistory } from '../lib/api';
+import { FlaskConical, Printer, CheckCheck, ExternalLink, Mail, TrendingUp, X, Search } from 'lucide-react';
+import { getOrders, getOrder, updateResult, markResultsComplete, getResultsReport, getAutofillForTest, getResultHistory, getLogo } from '../lib/api';
 import { triggerPrint } from '../lib/print';
 import { sendResultsEmail, isEmailConfigured } from '../lib/email';
 import type { OrderSummary, OrderDetail, ResultsReportData, ResultHistory } from '../types';
 import PrintResults from '../components/PrintResults';
+import { useAssets } from '../contexts/AssetsContext';
 import EZSelect from '../components/EZSelect';
 import Pagination from '../components/Pagination';
 import PageLoader from '../components/PageLoader';
@@ -43,7 +44,9 @@ export default function Results() {
   const [loadingDetail, setLoadingDetail] = useMinLoading(false);
   const [saving, setSaving] = useState(false);
   const [reportData, setReportData] = useState<ResultsReportData | null>(null);
+  const { logo, setLogo } = useAssets();
   const [orderPage, setOrderPage] = useState(1);
+  const [orderSearch, setOrderSearch] = useState('');
   const [trendModal, setTrendModal] = useState<{ testId: number; testName: string } | null>(null);
   const [trendData, setTrendData] = useState<ResultHistory[]>([]);
   const [loadingTrend, setLoadingTrend] = useState(false);
@@ -56,10 +59,19 @@ export default function Results() {
 
   useEffect(() => { loadOrders(); }, [loadOrders]);
 
-  const paginatedOrders = useMemo(() => {
-    const start = (orderPage - 1) * ORDER_PAGE_SIZE;
-    return orders.slice(start, start + ORDER_PAGE_SIZE);
-  }, [orders, orderPage]);
+  const filteredOrders = useMemo(() => {
+    if (!orderSearch.trim()) return orders;
+    const q = orderSearch.toLowerCase();
+    return orders.filter(o =>
+      o.patient_name.toLowerCase().includes(q) ||
+      o.order_number.toLowerCase().includes(q) ||
+      o.patient_ref.toLowerCase().includes(q)
+    );
+  }, [orders, orderSearch]);
+
+  const visibleCount = orderPage * ORDER_PAGE_SIZE;
+  const paginatedOrders = useMemo(() => filteredOrders.slice(0, visibleCount), [filteredOrders, visibleCount]);
+  const hasMore = visibleCount < filteredOrders.length;
 
   const selectOrder = useCallback(async (orderId: number) => {
     setLoadingDetail(true);
@@ -75,16 +87,20 @@ export default function Results() {
           flag: item.flag || 'N',
         };
       }
-      // Auto-fill unit and reference range from reference ranges for items with no saved values
-      const emptyItems = o.items.filter(item => !item.unit && !item.reference_range);
-      if (emptyItems.length > 0) {
+      // Auto-fill unit and/or reference range independently for any item missing either field
+      const needsFill = o.items.filter(item => !item.unit || !item.reference_range);
+      if (needsFill.length > 0) {
         const fills = await Promise.all(
-          emptyItems.map(item => getAutofillForTest(item.test_id, o.patient_gender, o.patient_age))
+          needsFill.map(item => getAutofillForTest(item.test_id, o.patient_gender, o.patient_age))
         );
         fills.forEach((fill, i) => {
           if (fill) {
-            const item = emptyItems[i];
-            init[item.id] = { ...init[item.id], unit: fill.unit, reference_range: fill.reference_range };
+            const item = needsFill[i];
+            init[item.id] = {
+              ...init[item.id],
+              unit: item.unit || fill.unit,
+              reference_range: item.reference_range || fill.reference_range,
+            };
           }
         });
       }
@@ -126,13 +142,13 @@ export default function Results() {
           icon: 'warning',
           title: `⚠ Critical Value${criticals.length > 1 ? 's' : ''} Detected`,
           html: criticals.map(i => `<strong>${i.test_name}</strong>: ${results[i.id].result_value} ${results[i.id].unit || ''}`).join('<br/>'),
-          confirmButtonColor: '#f54927',
+          confirmButtonColor: '#78001d',
         });
       } else {
         Swal.fire({ icon: 'success', title: 'Results Saved', timer: 2000, showConfirmButton: false });
       }
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     } finally {
       setSaving(false);
     }
@@ -157,7 +173,7 @@ export default function Results() {
       text: 'This will change the order status to completed.',
       icon: 'question',
       showCancelButton: true,
-      confirmButtonColor: '#f54927',
+      confirmButtonColor: '#78001d',
     });
     if (!result.isConfirmed) return;
     try {
@@ -166,14 +182,14 @@ export default function Results() {
       await Promise.all([selectOrder(selectedOrder.id), loadOrders()]);
       Swal.fire({ icon: 'success', title: 'Order Completed', timer: 2000, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     }
   };
 
   const handleEmailResults = async () => {
     if (!selectedOrder) return;
-    if (!isEmailConfigured()) {
-      Swal.fire({ icon: 'warning', title: 'Email Not Configured', text: 'Go to Settings → Email to set up EmailJS first.', confirmButtonColor: '#f54927' });
+    if (!await isEmailConfigured()) {
+      Swal.fire({ icon: 'warning', title: 'Email Not Configured', text: 'Go to Settings → Email to set up SMTP first.', confirmButtonColor: '#78001d' });
       return;
     }
     const { value: toEmail } = await Swal.fire({
@@ -181,22 +197,23 @@ export default function Results() {
       input: 'email',
       inputLabel: 'Patient email address',
       inputPlaceholder: 'patient@example.com',
+      inputValue: selectedOrder.patient_email || '',
       showCancelButton: true,
-      confirmButtonColor: '#f54927',
+      confirmButtonColor: '#78001d',
       confirmButtonText: 'Send',
     });
     if (!toEmail) return;
     setSaving(true);
     try {
-      const data = await getResultsReport(selectedOrder.id);
+      const [data, freshLogo] = await Promise.all([getResultsReport(selectedOrder.id), getLogo().catch(() => null)]);
       if (!data.categories.length) {
-        Swal.fire({ icon: 'warning', title: 'No Results', text: 'Save results first before emailing.', confirmButtonColor: '#f54927' });
+        Swal.fire({ icon: 'warning', title: 'No Results', text: 'Save results first before emailing.', confirmButtonColor: '#78001d' });
         return;
       }
-      await sendResultsEmail(data, toEmail);
+      await sendResultsEmail(data, toEmail, freshLogo);
       Swal.fire({ icon: 'success', title: 'Email Sent', text: `Results sent to ${toEmail}`, timer: 2500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Failed to Send', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Failed to Send', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     } finally {
       setSaving(false);
     }
@@ -218,12 +235,13 @@ export default function Results() {
           });
         }
       }
-      const data = await getResultsReport(selectedOrder.id);
+      const [data, freshLogo] = await Promise.all([getResultsReport(selectedOrder.id), getLogo().catch(() => null)]);
+      if (freshLogo && freshLogo !== logo) setLogo(freshLogo);
       flushSync(() => setReportData(data));
       triggerPrint();
       window.addEventListener('afterprint', () => setReportData(null), { once: true });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: String(err), confirmButtonColor: '#f54927' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
     } finally {
       setSaving(false);
     }
@@ -240,46 +258,103 @@ export default function Results() {
 
   return (
     <div>
-      {reportData && <div className="print-container"><PrintResults data={reportData} /></div>}
+      {reportData && <div className="print-container"><PrintResults data={reportData} logo={logo} /></div>}
 
       <div className="no-print">
         <div className="page-header">
           <div><h1>Lab Results</h1><p>Enter and manage test results</p></div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 20, alignItems: 'start' }}>
+        <div className="results-layout-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, alignItems: 'start' }}>
           {/* Order List */}
           <div className="card" style={{ padding: 0 }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', fontWeight: 700, fontSize: 13 }}>
-              Orders ({orders.length})
+            {/* Header + search */}
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--outline-variant)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--on-surface)' }}>
+                  Orders
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--on-surface-variant)', fontWeight: 600 }}>
+                  {filteredOrders.length} of {orders.length}
+                </span>
+              </div>
+              <div style={{ position: 'relative' }}>
+                <Search size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--on-surface-variant)' }} />
+                <input
+                  className="form-control"
+                  style={{ paddingLeft: 28, fontSize: 12, height: 30 }}
+                  placeholder="Search orders…"
+                  value={orderSearch}
+                  onChange={e => { setOrderSearch(e.target.value); setOrderPage(1); }}
+                />
+              </div>
             </div>
-            <div style={{ maxHeight: 560, overflowY: 'auto' }}>
+
+            {/* Order items */}
+            <div style={{ maxHeight: 520, overflowY: 'auto' }}>
               {loadingOrders ? (
-                <PageLoader label="Loading orders..." />
-              ) : orders.length === 0 ? (
-                <div className="empty-state" style={{ padding: 24 }}><p>No orders</p></div>
-              ) : paginatedOrders.map(o => (
-                <div
-                  key={o.id}
-                  onClick={() => selectOrder(o.id)}
-                  style={{
-                    padding: '10px 14px',
-                    cursor: 'pointer',
-                    borderBottom: '1px solid var(--border-color)',
-                    background: selectedOrder?.id === o.id ? 'rgba(245,73,39,0.08)' : 'transparent',
-                    transition: 'background 0.15s',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                    <span className="font-mono" style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary-color)' }}>{o.order_number}</span>
-                    <span className={`badge badge-${o.status}`} style={{ fontSize: 10 }}>{o.status}</span>
-                  </div>
-                  <div style={{ fontSize: 12.5, fontWeight: 600 }}>{o.patient_name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{fmtDate(o.order_date)} · {o.item_count} tests</div>
+                <PageLoader label="Loading orders…" />
+              ) : filteredOrders.length === 0 ? (
+                <div className="empty-state" style={{ padding: 24 }}>
+                  <p style={{ fontSize: 13 }}>{orderSearch ? 'No matching orders' : 'No orders found'}</p>
                 </div>
-              ))}
+              ) : (
+                <>
+                  {paginatedOrders.map(o => (
+                    <div
+                      key={o.id}
+                      onClick={() => selectOrder(o.id)}
+                      style={{
+                        padding: '10px 14px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid color-mix(in srgb, var(--outline-variant) 60%, transparent)',
+                        background: selectedOrder?.id === o.id
+                          ? 'color-mix(in srgb, var(--primary) 8%, transparent)'
+                          : 'transparent',
+                        transition: 'background 0.12s',
+                        borderLeft: selectedOrder?.id === o.id ? '3px solid var(--primary)' : '3px solid transparent',
+                      }}
+                      onMouseEnter={e => {
+                        if (selectedOrder?.id !== o.id)
+                          (e.currentTarget as HTMLDivElement).style.background = 'var(--surface-container-low)';
+                      }}
+                      onMouseLeave={e => {
+                        if (selectedOrder?.id !== o.id)
+                          (e.currentTarget as HTMLDivElement).style.background = 'transparent';
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', fontFamily: 'monospace' }}>
+                          {o.order_number}
+                        </span>
+                        <span className={`badge badge-${o.status}`}>{o.status}</span>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--on-surface)', marginBottom: 2 }}>
+                        {o.patient_name}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--on-surface-variant)', display: 'flex', gap: 8 }}>
+                        <span>{fmtDate(o.order_date)}</span>
+                        <span>·</span>
+                        <span>{o.item_count} test{o.item_count !== 1 ? 's' : ''}</span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Load More */}
+                  {hasMore && (
+                    <div style={{ padding: '12px 14px', textAlign: 'center', borderTop: '1px solid var(--outline-variant)' }}>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}
+                        onClick={() => setOrderPage(p => p + 1)}
+                      >
+                        Load More ({filteredOrders.length - visibleCount} remaining)
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
-            <Pagination total={orders.length} page={orderPage} pageSize={ORDER_PAGE_SIZE} onChange={setOrderPage} />
           </div>
 
           {/* Results Entry */}
@@ -333,7 +408,7 @@ export default function Results() {
 
                 {Object.entries(grouped).map(([cat, items]) => (
                   <div key={cat} style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary-color)', letterSpacing: 0.5, marginBottom: 6, paddingBottom: 4, borderBottom: '2px solid rgba(245,73,39,0.2)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary)', letterSpacing: '0.05em', marginBottom: 6, borderLeft: '4px solid var(--primary)', background: 'var(--surface-container-low)', padding: '6px 12px 6px 8px' }}>
                       {cat}
                     </div>
                     {items.map(item => (

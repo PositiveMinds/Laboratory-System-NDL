@@ -1,3 +1,11 @@
+export interface AppNotification {
+  id: string;
+  kind: 'critical' | 'pending' | 'unpaid';
+  title: string;
+  subtitle: string;
+  order_id?: number;
+}
+
 export interface SessionUser {
   id: number;
   username: string;
@@ -6,6 +14,7 @@ export interface SessionUser {
   phone?: string;
   title?: string;
   email?: string;
+  photo?: string;
 }
 
 export interface Patient {
@@ -49,6 +58,7 @@ export interface OrderSummary {
   payment_status: 'paid' | 'unpaid' | 'partial';
   notes?: string;
   item_count: number;
+  patient_email?: string;
 }
 
 export interface OrderItem {
@@ -284,6 +294,15 @@ export interface ResultHistory {
   result_value: string;
   order_number: string;
   order_id: number;
+}
+
+export interface LabInfo {
+  name: string;
+  tagline: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
 }
 
 export interface SmtpConfig {

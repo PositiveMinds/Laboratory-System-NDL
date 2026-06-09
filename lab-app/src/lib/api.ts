@@ -5,7 +5,7 @@ import type {
   CreatePatientInput, CreateOrderInput, RevenueStat, TopTest,
   ReferenceRange, AutoFillData,
   PendingOrder, WorkloadStat, FinancialStat, TATItem, CriticalItem,
-  AuditLog, SearchResult, ResultHistory, SmtpConfig,
+  AuditLog, SearchResult, ResultHistory, SmtpConfig, LabInfo,
 } from '../types';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────
@@ -195,5 +195,25 @@ export const saveSmtpConfig = (input: {
 export const getSmtpConfig = () =>
   invoke<SmtpConfig | null>('get_smtp_config');
 
+// ─── Lab Info ──────────────────────────────────────────────────────────────
+export const saveLabInfo = (input: LabInfo) =>
+  invoke<void>('save_lab_info', { input });
+
+export const getLabInfo = () =>
+  invoke<LabInfo>('get_lab_info');
+
 export const sendEmailSmtp = (toEmail: string, subject: string, htmlBody: string) =>
   invoke<void>('send_email_smtp', { toEmail, subject, htmlBody });
+
+// ─── Logo & Profile Photo ──────────────────────────────────────────────────
+export const backupDatabaseTo = (destDir: string) =>
+  invoke<string>('backup_database_to', { destDir });
+
+export const getNotifications = () =>
+  invoke<import('../types').AppNotification[]>('get_notifications');
+
+export const saveLogo = (data: string) => invoke<void>('save_logo', { data });
+export const getLogo  = () => invoke<string | null>('get_logo');
+export const deleteLogo = () => invoke<void>('delete_logo');
+export const saveProfilePhoto = (data: string) =>
+  invoke<import('../types').SessionUser>('save_profile_photo', { data });

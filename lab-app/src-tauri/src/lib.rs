@@ -24,6 +24,7 @@ pub struct SessionUser {
     pub phone: Option<String>,
     pub title: Option<String>,
     pub email: Option<String>,
+    pub photo: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,6 +56,15 @@ pub struct TestItem {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AppNotification {
+    pub id: String,
+    pub kind: String,        // "critical" | "pending" | "unpaid"
+    pub title: String,
+    pub subtitle: String,
+    pub order_id: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OrderSummary {
     pub id: i64,
     pub order_number: String,
@@ -71,6 +81,7 @@ pub struct OrderSummary {
     pub payment_status: String,
     pub notes: Option<String>,
     pub item_count: i64,
+    pub patient_email: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -332,6 +343,18 @@ pub struct ResultHistory {
     pub order_id: i64,
 }
 
+// ─── Lab Info ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LabInfo {
+    pub name: String,
+    pub tagline: String,
+    pub address: String,
+    pub phone: String,
+    pub email: String,
+    pub website: String,
+}
+
 // ─── SMTP Config ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -531,6 +554,7 @@ fn init_db(conn: &Connection) -> rusqlite::Result<()> {
     let _ = conn.execute("ALTER TABLE test_orders ADD COLUMN collected_at TEXT", []);
     let _ = conn.execute("ALTER TABLE test_orders ADD COLUMN verified_by INTEGER REFERENCES users(id)", []);
     let _ = conn.execute("ALTER TABLE test_orders ADD COLUMN verified_at TEXT", []);
+    let _ = conn.execute("ALTER TABLE users ADD COLUMN photo TEXT", []);
     Ok(())
 }
 
@@ -674,12 +698,14 @@ fn row_to_summary(r: &rusqlite::Row) -> rusqlite::Result<OrderSummary> {
     let paid: f64 = r.get(8)?;
     let discount: f64 = r.get(12)?;
     let effective = total - discount;
+    let patient_email: Option<String> = r.get(13).ok().and_then(|s: String| if s.is_empty() { None } else { Some(s) });
     Ok(OrderSummary {
         id: r.get(0)?, order_number: r.get(1)?, patient_id: r.get(2)?,
         patient_name: r.get(3)?, patient_ref: r.get(4)?, ordered_by_name: r.get(5)?,
         order_date: r.get(6)?, total_amount: total, discount_amount: discount, amount_paid: paid,
         balance: effective - paid, status: r.get(9)?, notes: r.get(10)?,
         item_count: r.get(11)?, payment_status: payment_status(effective, paid),
+        patient_email,
     })
 }
 
@@ -693,7 +719,7 @@ fn db_get_orders(db: &Connection, status_filter: &str, search: &str) -> Result<V
         "SELECT o.id, o.order_number, o.patient_id, p.full_name, p.patient_id,
                 u.full_name, o.order_date, o.total_amount, o.amount_paid, o.status, o.notes,
                 (SELECT COUNT(*) FROM test_order_items WHERE order_id = o.id),
-                COALESCE(o.discount_amount, 0.0)
+                COALESCE(o.discount_amount, 0.0), COALESCE(p.email, '')
          FROM test_orders o
          JOIN patients p ON o.patient_id = p.id
          JOIN users u ON o.ordered_by = u.id
@@ -704,7 +730,7 @@ fn db_get_orders(db: &Connection, status_filter: &str, search: &str) -> Result<V
             "SELECT o.id, o.order_number, o.patient_id, p.full_name, p.patient_id,
                     u.full_name, o.order_date, o.total_amount, o.amount_paid, o.status, o.notes,
                     (SELECT COUNT(*) FROM test_order_items WHERE order_id = o.id),
-                    COALESCE(o.discount_amount, 0.0)
+                    COALESCE(o.discount_amount, 0.0), COALESCE(p.email, '')
              FROM test_orders o
              JOIN patients p ON o.patient_id = p.id
              JOIN users u ON o.ordered_by = u.id
@@ -795,17 +821,17 @@ pub mod commands {
         let db = state.db.lock().map_err(|_| "DB lock error".to_string())?;
         db.execute_batch("PRAGMA foreign_keys = ON;").ok();
         let row = db.query_row(
-            "SELECT id, username, full_name, password_hash, role, COALESCE(failed_attempts,0), locked_until, phone, title, email FROM users WHERE username = ?1",
+            "SELECT id, username, full_name, password_hash, role, COALESCE(failed_attempts,0), locked_until, phone, title, email, photo FROM users WHERE username = ?1",
             params![username],
             |r| Ok((r.get::<_,i64>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?,
                      r.get::<_,String>(3)?, r.get::<_,String>(4)?,
                      r.get::<_,i64>(5)?, r.get::<_,Option<String>>(6)?,
                      r.get::<_,Option<String>>(7)?, r.get::<_,Option<String>>(8)?,
-                     r.get::<_,Option<String>>(9)?)),
+                     r.get::<_,Option<String>>(9)?, r.get::<_,Option<String>>(10)?)),
         ).optional().map_err(|e| e.to_string())?;
         match row {
             None => Err("Invalid username or password".to_string()),
-            Some((id, uname, full_name, hash_str, role, failed_attempts, locked_until, phone, title, email)) => {
+            Some((id, uname, full_name, hash_str, role, failed_attempts, locked_until, phone, title, email, photo)) => {
                 let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
                 if let Some(ref until) = locked_until {
                     if now < *until {
@@ -814,7 +840,7 @@ pub mod commands {
                 }
                 if verify(&password, &hash_str).map_err(|e| e.to_string())? {
                     db.execute("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?1", params![id]).ok();
-                    let user = SessionUser { id, username: uname.clone(), full_name: full_name.clone(), role: role.clone(), phone, title, email };
+                    let user = SessionUser { id, username: uname.clone(), full_name: full_name.clone(), role: role.clone(), phone, title, email, photo };
                     log_action(&db, id, &full_name, "login", Some("user"), Some(id), None);
                     *state.session.lock().map_err(|_| "Lock error".to_string())? = Some(user.clone());
                     Ok(user)
@@ -887,10 +913,141 @@ pub mod commands {
             phone: phone.filter(|s| !s.is_empty()),
             title: title.filter(|s| !s.is_empty()),
             email: email.filter(|s| !s.is_empty()),
+            photo: user.photo.clone(),
         };
         *state.session.lock().map_err(|_| "Lock error".to_string())? = Some(updated.clone());
         log_action(&db, user.id, &updated.full_name, "update_profile", Some("user"), Some(user.id), None);
         Ok(updated)
+    }
+
+    // ── Logo & Profile Photo ─────────────────────────────────────
+    #[tauri::command]
+    pub fn save_logo(data: String, state: State<AppState>) -> Result<(), String> {
+        require_session(&state.session)?;
+        let db = state.db.lock().map_err(|_| "DB lock error".to_string())?;
+        db.execute(
+            "INSERT INTO app_settings (key, value) VALUES ('lab_logo', ?1) ON CONFLICT(key) DO UPDATE SET value = ?1",
+            params![data],
+        ).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    #[tauri::command]
+    pub fn get_logo(state: State<AppState>) -> Result<Option<String>, String> {
+        let db = state.db.lock().map_err(|_| "DB lock error".to_string())?;
+        let val: Option<String> = db.query_row(
+            "SELECT value FROM app_settings WHERE key = 'lab_logo'",
+            [],
+            |r| r.get(0),
+        ).optional().map_err(|e| e.to_string())?;
+        Ok(val)
+    }
+
+    #[tauri::command]
+    pub fn save_profile_photo(data: String, state: State<AppState>) -> Result<SessionUser, String> {
+        let user = require_session(&state.session)?;
+        let db = state.db.lock().map_err(|_| "DB lock error".to_string())?;
+        let photo_val: Option<String> = if data.is_empty() { None } else { Some(data) };
+        db.execute(
+            "UPDATE users SET photo = ?1 WHERE id = ?2",
+            params![photo_val, user.id],
+        ).map_err(|e| e.to_string())?;
+        let updated = SessionUser { photo: photo_val, ..user };
+        *state.session.lock().map_err(|_| "Lock error".to_string())? = Some(updated.clone());
+        Ok(updated)
+    }
+
+    #[tauri::command]
+    pub fn get_notifications(state: State<AppState>) -> Result<Vec<AppNotification>, String> {
+        require_session(&state.session)?;
+        let db = state.db.lock().map_err(|_| "DB lock error".to_string())?;
+        let mut notes: Vec<AppNotification> = Vec::new();
+
+        // 1. Critical flagged results (last 7 days)
+        {
+            let mut stmt = db.prepare(
+                "SELECT oi.id, oi.test_name, p.full_name, o.id, o.order_number
+                 FROM test_order_items oi
+                 JOIN test_orders o ON oi.order_id = o.id
+                 JOIN patients p ON o.patient_id = p.id
+                 WHERE oi.flag = 'C' AND oi.result_date >= date('now','-7 days')
+                 ORDER BY oi.result_date DESC LIMIT 10"
+            ).map_err(|e| e.to_string())?;
+            let rows = stmt.query_map([], |r| {
+                Ok((r.get::<_,i64>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?,
+                    r.get::<_,i64>(3)?, r.get::<_,String>(4)?))
+            }).map_err(|e| e.to_string())?;
+            for row in rows.flatten() {
+                let (item_id, test_name, patient, order_id, order_number) = row;
+                notes.push(AppNotification {
+                    id: format!("crit-{}", item_id),
+                    kind: "critical".to_string(),
+                    title: format!("Critical: {}", test_name),
+                    subtitle: format!("{} — {}", patient, order_number),
+                    order_id: Some(order_id),
+                });
+            }
+        }
+
+        // 2. Orders pending results for more than 2 days
+        {
+            let mut stmt = db.prepare(
+                "SELECT o.id, o.order_number, p.full_name, CAST(julianday('now') - julianday(o.order_date) AS INTEGER) as days
+                 FROM test_orders o
+                 JOIN patients p ON o.patient_id = p.id
+                 WHERE o.status = 'pending' AND o.order_date <= date('now','-2 days')
+                 ORDER BY o.order_date ASC LIMIT 10"
+            ).map_err(|e| e.to_string())?;
+            let rows = stmt.query_map([], |r| {
+                Ok((r.get::<_,i64>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?, r.get::<_,i64>(3)?))
+            }).map_err(|e| e.to_string())?;
+            for row in rows.flatten() {
+                let (order_id, order_number, patient, days) = row;
+                notes.push(AppNotification {
+                    id: format!("pending-{}", order_id),
+                    kind: "pending".to_string(),
+                    title: format!("Awaiting results — {} day{}", days, if days == 1 { "" } else { "s" }),
+                    subtitle: format!("{} — {}", patient, order_number),
+                    order_id: Some(order_id),
+                });
+            }
+        }
+
+        // 3. Unpaid orders (top 10 by amount)
+        {
+            let mut stmt = db.prepare(
+                "SELECT o.id, o.order_number, p.full_name, (o.total_amount - COALESCE(o.discount_amount,0) - o.amount_paid) as balance
+                 FROM test_orders o
+                 JOIN patients p ON o.patient_id = p.id
+                 WHERE o.amount_paid < (o.total_amount - COALESCE(o.discount_amount,0))
+                   AND o.status != 'cancelled'
+                 ORDER BY balance DESC LIMIT 10"
+            ).map_err(|e| e.to_string())?;
+            let rows = stmt.query_map([], |r| {
+                Ok((r.get::<_,i64>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?, r.get::<_,f64>(3)?))
+            }).map_err(|e| e.to_string())?;
+            for row in rows.flatten() {
+                let (order_id, order_number, patient, balance) = row;
+                notes.push(AppNotification {
+                    id: format!("unpaid-{}", order_id),
+                    kind: "unpaid".to_string(),
+                    title: format!("Unpaid: UGX {:.0}", balance),
+                    subtitle: format!("{} — {}", patient, order_number),
+                    order_id: Some(order_id),
+                });
+            }
+        }
+
+        Ok(notes)
+    }
+
+    #[tauri::command]
+    pub fn delete_logo(state: State<AppState>) -> Result<(), String> {
+        require_session(&state.session)?;
+        let db = state.db.lock().map_err(|_| "DB lock error".to_string())?;
+        db.execute("DELETE FROM app_settings WHERE key = 'lab_logo'", [])
+            .map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     // Users
@@ -1243,7 +1400,7 @@ pub mod commands {
         let mut sql = "SELECT o.id, o.order_number, o.patient_id, p.full_name, p.patient_id,
                               u.full_name, o.order_date, o.total_amount, o.amount_paid, o.status, o.notes,
                               (SELECT COUNT(*) FROM test_order_items WHERE order_id = o.id),
-                              COALESCE(o.discount_amount, 0.0)
+                              COALESCE(o.discount_amount, 0.0), COALESCE(p.email, '')
                        FROM test_orders o
                        JOIN patients p ON o.patient_id = p.id
                        JOIN users u ON o.ordered_by = u.id
@@ -1583,6 +1740,24 @@ pub mod commands {
         Ok(backup_path.to_string_lossy().to_string())
     }
 
+    #[tauri::command]
+    pub fn backup_database_to(dest_dir: String, app_handle: tauri::AppHandle, state: State<AppState>) -> Result<String, String> {
+        require_session(&state.session)?;
+        let data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+        let db_path = data_dir.join("ndl_lab.db");
+        let dest = std::path::PathBuf::from(&dest_dir);
+        if !dest.exists() {
+            std::fs::create_dir_all(&dest).map_err(|e| format!("Cannot create directory: {}", e))?;
+        }
+        if !dest.is_dir() {
+            return Err("The specified path is not a directory".to_string());
+        }
+        let now = Local::now().format("%Y%m%d_%H%M%S").to_string();
+        let backup_path = dest.join(format!("ndl_lab_{}.db", now));
+        std::fs::copy(&db_path, &backup_path).map_err(|e| format!("Backup failed: {}", e))?;
+        Ok(backup_path.to_string_lossy().to_string())
+    }
+
     // Discounts
     #[tauri::command]
     pub fn set_discount(order_id: i64, discount_amount: f64, discount_reason: Option<String>, state: State<AppState>) -> Result<(), String> {
@@ -1910,6 +2085,45 @@ pub mod commands {
         Ok(())
     }
 
+    // Lab Info
+    #[tauri::command]
+    pub fn save_lab_info(input: serde_json::Value, state: State<AppState>) -> Result<(), String> {
+        require_session(&state.session)?;
+        let db = state.db.lock().map_err(|_| "DB lock error".to_string())?;
+        let fields = [
+            ("lab_name",    input["name"].as_str().unwrap_or("")),
+            ("lab_tagline", input["tagline"].as_str().unwrap_or("")),
+            ("lab_address", input["address"].as_str().unwrap_or("")),
+            ("lab_phone",   input["phone"].as_str().unwrap_or("")),
+            ("lab_email",   input["email"].as_str().unwrap_or("")),
+            ("lab_website", input["website"].as_str().unwrap_or("")),
+        ];
+        for (key, value) in &fields {
+            db.execute(
+                "INSERT INTO app_settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![key, value],
+            ).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
+    #[tauri::command]
+    pub fn get_lab_info(state: State<AppState>) -> Result<LabInfo, String> {
+        let db = state.db.lock().map_err(|_| "DB lock error".to_string())?;
+        let get = |key: &str| -> String {
+            db.query_row("SELECT value FROM app_settings WHERE key = ?1", params![key], |r| r.get(0))
+                .unwrap_or_default()
+        };
+        Ok(LabInfo {
+            name:    get("lab_name"),
+            tagline: get("lab_tagline"),
+            address: get("lab_address"),
+            phone:   get("lab_phone"),
+            email:   get("lab_email"),
+            website: get("lab_website"),
+        })
+    }
+
     // Dashboard
     #[tauri::command]
     pub fn get_dashboard_stats(state: State<AppState>) -> Result<DashboardStats, String> {
@@ -1934,6 +2148,7 @@ pub mod commands {
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()
                 .unwrap_or_else(|_| std::env::current_dir().unwrap());
@@ -1980,6 +2195,10 @@ pub fn run() {
             commands::global_search, commands::get_audit_logs,
             commands::restore_database, commands::get_result_history,
             commands::save_smtp_config, commands::get_smtp_config, commands::send_email_smtp,
+            commands::save_lab_info, commands::get_lab_info,
+            commands::save_logo, commands::get_logo, commands::delete_logo,
+            commands::save_profile_photo, commands::backup_database_to,
+            commands::get_notifications,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
