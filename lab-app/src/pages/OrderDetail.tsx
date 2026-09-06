@@ -9,7 +9,7 @@ import {
 import {
   getOrder, updateOrderStatus, deleteOrder, getReceiptData, addPayment,
   getOrderPayments, getResultsReport, getTests, addTestsToOrder, verifyOrder,
-  setDiscount, getLogo, getLabInfo,
+  setDiscount, getLogo, getLabInfo, getErrorMessage,
 } from '../lib/api';
 import { triggerPrint, autoPrintEnabled } from '../lib/print';
 import type { OrderDetail as OD, Payment, ReceiptData, ResultsReportData, TestItem, LabInfo } from '../types';
@@ -96,7 +96,7 @@ export default function OrderDetailPage() {
       await load();
       Swal.fire({ icon: 'success', title: 'Updated', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -107,7 +107,7 @@ export default function OrderDetailPage() {
       await deleteOrder(orderId);
       navigate('/orders');
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -130,7 +130,7 @@ export default function OrderDetailPage() {
         Swal.fire({ icon: 'success', title: 'Payment Recorded', timer: 2000, showConfirmButton: false });
       }
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setPaying(false);
     }
@@ -141,10 +141,12 @@ export default function OrderDetailPage() {
       const [data, freshLogo] = await Promise.all([getReceiptData(orderId), getLogo().catch(() => null)]);
       if (freshLogo && freshLogo !== logo) setLogo(freshLogo);
       flushSync(() => setReceipt(data));
-      triggerPrint();
-      window.addEventListener('afterprint', () => setReceipt(null), { once: true });
+      setTimeout(() => {
+        triggerPrint();
+        window.addEventListener('afterprint', () => setReceipt(null), { once: true });
+      }, 300);
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -156,7 +158,7 @@ export default function OrderDetailPage() {
       await load();
       Swal.fire({ icon: 'success', title: 'Verified', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -165,10 +167,12 @@ export default function OrderDetailPage() {
       const [data, freshLogo] = await Promise.all([getResultsReport(orderId), getLogo().catch(() => null)]);
       if (freshLogo && freshLogo !== logo) setLogo(freshLogo);
       flushSync(() => setReportData(data));
-      triggerPrint();
-      window.addEventListener('afterprint', () => setReportData(null), { once: true });
+      setTimeout(() => {
+        triggerPrint();
+        window.addEventListener('afterprint', () => setReportData(null), { once: true });
+      }, 300);
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -200,7 +204,7 @@ export default function OrderDetailPage() {
       await load();
       Swal.fire({ icon: 'success', title: 'Discount Applied', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -228,7 +232,7 @@ export default function OrderDetailPage() {
       setShowAddTestsModal(false);
       Swal.fire({ icon: 'success', title: `${items.length} test(s) added`, timer: 2000, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setAddingTests(false);
     }

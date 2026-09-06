@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useMinLoading } from '../hooks/useMinLoading';
 import { Search, Plus, Loader2, UserX, Pencil } from 'lucide-react';
-import { getPatients, createPatient, updatePatient } from '../lib/api';
+import { getPatients, createPatient, updatePatient, getErrorMessage } from '../lib/api';
 import type { Patient, CreatePatientInput } from '../types';
 import Modal from '../components/Modal';
 import EZSelect from '../components/EZSelect';
@@ -69,7 +69,7 @@ export default function Patients() {
       }
       setShowModal(false);
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setSaving(false);
     }

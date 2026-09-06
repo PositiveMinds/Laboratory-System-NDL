@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useMinLoading } from '../hooks/useMinLoading';
 import { useNavigate } from 'react-router-dom';
 import { Search, Check, Loader2, X } from 'lucide-react';
-import { getPatients, getTests, createOrder } from '../lib/api';
+import { getPatients, getTests, createOrder, getErrorMessage } from '../lib/api';
 import type { Patient, TestItem } from '../types';
 import PageLoader from '../components/PageLoader';
 import EZDatePicker from '../components/EZDatePicker';
@@ -101,7 +101,7 @@ export default function NewOrder() {
       });
       navigate(`/orders/${order.id}`);
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setSubmitting(false);
     }

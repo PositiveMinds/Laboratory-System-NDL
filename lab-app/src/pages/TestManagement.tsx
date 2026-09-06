@@ -9,7 +9,7 @@ import {
   getOrders,
   getTestCategories, getTests, updateTestPrice,
   createTestCategory, deleteTestCategory, renameTestCategory,
-  createTest, deleteTest,
+  createTest, deleteTest, getErrorMessage,
 } from '../lib/api';
 import type { OrderSummary, TestItem, TestCategory } from '../types';
 import { fmtUGX } from '../lib/currency';
@@ -130,7 +130,7 @@ export default function TestManagement() {
       setTests(ts => ts.map(t => ({ ...t, price: parseInt(editPrices[t.id]) ?? t.price })));
       Swal.fire({ icon: 'success', title: `${changed.length} Price(s) Updated`, timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setPriceSaving(null);
     }
@@ -151,7 +151,7 @@ export default function TestManagement() {
       setCategories(cs => [...cs, cat]);
       Swal.fire({ icon: 'success', title: 'Category Added', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -167,7 +167,7 @@ export default function TestManagement() {
       setCategories(cs => cs.map(c => c.id === catId ? { ...c, name: name.trim() } : c));
       setTests(ts => ts.map(t => t.category_id === catId ? { ...t, category_name: name.trim() } : t));
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -181,7 +181,7 @@ export default function TestManagement() {
       await deleteTestCategory(catId);
       setCategories(cs => cs.filter(c => c.id !== catId));
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -224,7 +224,7 @@ export default function TestManagement() {
       }
       setShowTestModal(false);
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setTestSaving(false);
     }
@@ -240,7 +240,7 @@ export default function TestManagement() {
       await deleteTest(t.id);
       setTests(ts => ts.filter(x => x.id !== t.id));
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 

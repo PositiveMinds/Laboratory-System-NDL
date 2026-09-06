@@ -6,7 +6,7 @@ import {
   ClipboardList, CheckCircle, AlertTriangle, CreditCard,
   Printer, ReceiptText, Mail,
 } from 'lucide-react';
-import { getBilling, addPayment, getReceiptData, getLogo } from '../lib/api';
+import { getBilling, addPayment, getReceiptData, getLogo, getErrorMessage } from '../lib/api';
 import { useAssets } from '../contexts/AssetsContext';
 import { triggerPrint, autoPrintEnabled } from '../lib/print';
 import { sendReceiptEmail, sendBalanceReminderEmail } from '../lib/email';
@@ -102,7 +102,7 @@ export default function Billing() {
         Swal.fire({ icon: 'success', title: 'Payment Recorded', timer: 2000, showConfirmButton: false });
       }
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setPaying(false);
     }
@@ -125,7 +125,7 @@ export default function Billing() {
       await sendReceiptEmail(data, toEmail, freshLogo);
       Swal.fire({ icon: 'success', title: 'Receipt Sent', text: `Receipt emailed to ${toEmail}`, timer: 2500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Failed to Send', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Failed to Send', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -150,7 +150,7 @@ export default function Billing() {
       }, o.patient_email);
       Swal.fire({ icon: 'success', title: 'Reminder Sent', text: `Balance reminder sent to ${o.patient_email}`, timer: 2000, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Failed', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Failed', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -159,10 +159,12 @@ export default function Billing() {
       const [data, freshLogo] = await Promise.all([getReceiptData(orderId), getLogo().catch(() => null)]);
       if (freshLogo && freshLogo !== logo) setLogo(freshLogo);
       flushSync(() => setReceipt(data));
-      triggerPrint();
-      window.addEventListener('afterprint', () => setReceipt(null), { once: true });
+      setTimeout(() => {
+        triggerPrint();
+        window.addEventListener('afterprint', () => setReceipt(null), { once: true });
+      }, 300);
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 

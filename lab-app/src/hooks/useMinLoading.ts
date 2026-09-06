@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from 'react';
  * Like useState for a loading flag, but guarantees the loader stays visible
  * for at least `minMs` milliseconds so it never flashes and disappears instantly.
  */
-export function useMinLoading(initial = true, minMs = 450) {
+export function useMinLoading(initial = true, minMs = 800) {
   const [loading, setRaw] = useState(initial);
   const startRef = useRef<number | null>(initial ? Date.now() : null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

@@ -1341,8 +1341,8 @@ pub mod commands {
         let db = state.db.lock().map_err(|_| "DB lock error".to_string())?;
         db.execute_batch("PRAGMA foreign_keys = ON;").ok();
         let order_num = {
-            let count: i64 = db.query_row("SELECT COUNT(*) FROM test_orders", [], |r| r.get(0)).map_err(|e| e.to_string())?;
-            format!("ORD{:06}", count + 1)
+            let max_id: i64 = db.query_row("SELECT COALESCE(MAX(id), 0) FROM test_orders", [], |r| r.get(0)).map_err(|e| e.to_string())?;
+            format!("ORD{:06}", max_id + 1)
         };
         let total: f64 = input.items.iter().map(|i| i.price).sum();
         db.execute(
@@ -2149,6 +2149,8 @@ pub mod commands {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()
                 .unwrap_or_else(|_| std::env::current_dir().unwrap());

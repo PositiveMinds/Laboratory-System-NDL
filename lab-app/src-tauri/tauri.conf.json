@@ -27,7 +27,14 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
+    "createUpdaterArtifacts": true,
+    "windows": {
+      "webviewInstallMode": {
+        "type": "offlineInstaller",
+        "silent": true
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -35,5 +42,14 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/PositiveMinds/Laboratory-System-NDL/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENEMDJEMjgwMTU0OTIzOTEKUldTUkkwa1ZnTklDemVDaWQ0Zml3dEUwZlJLTGVidFhlSEZ2L1hEVTVPOTcxSDdHUnc5ZDJqQ0UK"
+    }
   }
 }

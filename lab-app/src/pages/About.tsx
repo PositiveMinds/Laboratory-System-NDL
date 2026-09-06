@@ -1,7 +1,8 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FlaskConical, Mail, Phone, ArrowLeft, ExternalLink } from 'lucide-react';
+import { FlaskConical, Mail, Phone, ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react';
 import { useAssets } from '../contexts/AssetsContext';
+import { checkForUpdates } from '../lib/updater';
 
 const DEVELOPER = {
   company: 'E-Zone Technologies',
@@ -91,6 +92,13 @@ function ContactCard({
 export default function About() {
   const navigate = useNavigate();
   const { logo } = useAssets(); // uploaded logo from Settings → Branding
+  const [checking, setChecking] = useState(false);
+
+  const handleCheckUpdates = async () => {
+    setChecking(true);
+    try { await checkForUpdates(false); }
+    finally { setChecking(false); }
+  };
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
@@ -164,6 +172,9 @@ export default function About() {
               ))}
             </div>
           </div>
+          <button className="btn btn-secondary btn-sm" onClick={handleCheckUpdates} disabled={checking} style={{ flexShrink: 0 }}>
+            <RefreshCw size={13} className={checking ? 'spin' : undefined} /> {checking ? 'Checking…' : 'Check for Updates'}
+          </button>
         </div>
 
       </div>

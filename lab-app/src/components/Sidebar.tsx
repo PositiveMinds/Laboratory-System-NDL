@@ -1,23 +1,31 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList, CreditCard,
-  FlaskConical, Settings, LogOut, BarChart2,
+  FlaskConical, Settings, LogOut, BarChart2, Microscope, HelpCircle, Info,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { logout } from '../lib/api';
 import Swal from 'sweetalert2';
 
 const NAV_ITEMS = [
-  { to: '/dashboard', label: 'Dashboard',   Icon: LayoutDashboard },
-  { to: '/patients',  label: 'Patients',    Icon: Users },
-  { to: '/orders',    label: 'Test Orders', Icon: ClipboardList },
-  { to: '/billing',   label: 'Billing',     Icon: CreditCard },
-  { to: '/results',   label: 'Lab Results', Icon: FlaskConical },
-  { to: '/reports',   label: 'Reports',     Icon: BarChart2 },
-  { to: '/settings',  label: 'Settings',    Icon: Settings },
+  { to: '/dashboard',       label: 'Dashboard',       Icon: LayoutDashboard },
+  { to: '/patients',        label: 'Patients',        Icon: Users },
+  { to: '/test-management', label: 'Test Management', Icon: Microscope },
+  { to: '/orders',          label: 'Test Orders',     Icon: ClipboardList },
+  { to: '/billing',         label: 'Billing',         Icon: CreditCard },
+  { to: '/results',         label: 'Lab Results',     Icon: FlaskConical },
+  { to: '/reports',         label: 'Reports',         Icon: BarChart2 },
+  { to: '/settings',        label: 'Settings',        Icon: Settings },
+  { to: '/faq',             label: 'Help & FAQ',      Icon: HelpCircle },
+  { to: '/about',           label: 'About',           Icon: Info },
 ];
 
-export default function Sidebar() {
+interface Props {
+  open?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ open = false, onClose }: Props) {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
 
@@ -29,7 +37,7 @@ export default function Sidebar() {
       showCancelButton: true,
       confirmButtonText: 'Sign Out',
       cancelButtonText: 'Cancel',
-      confirmButtonColor: '#f54927',
+      confirmButtonColor: '#78001d',
     });
     if (result.isConfirmed) {
       await logout();
@@ -46,46 +54,63 @@ export default function Sidebar() {
     .slice(0, 2) || 'U';
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-brand">
-        <div className="brand-icon">NDL</div>
-        <div className="brand-text">
-          <h2>NDL</h2>
-          <span>Noble Diagnostic Laboratory</span>
-        </div>
-      </div>
+    <>
+      {/* Mobile backdrop */}
+      {open && <div className="sidebar-backdrop show" onClick={onClose} />}
 
-      <nav className="sidebar-nav">
-        <div className="nav-section-title">Navigation</div>
-        {NAV_ITEMS.map(({ to, label, Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-          >
-            <Icon size={17} className="nav-icon" />
-            {label}
-          </NavLink>
-        ))}
-      </nav>
-
-      <div className="sidebar-footer">
-        <div className="user-card">
-          <div className="user-avatar">{initials}</div>
-          <div className="user-info-text">
-            <strong>{user?.full_name}</strong>
-            <small>{user?.role}</small>
+      <aside className={`sidebar${open ? ' open' : ''}`}>
+        {/* Brand */}
+        <div className="sidebar-brand">
+          <div className="brand-icon">NDL</div>
+          <div className="brand-text">
+            <h2>NDL Lab</h2>
           </div>
-          <button
-            className="icon-btn"
-            onClick={handleLogout}
-            title="Sign Out"
-            style={{ width: 28, height: 28, flexShrink: 0 }}
-          >
-            <LogOut size={14} />
-          </button>
         </div>
-      </div>
-    </aside>
+
+        {/* Section header */}
+        <div className="sidebar-section-header">
+          <p>Core Modules</p>
+          <p>Clinical Operations</p>
+        </div>
+
+        {/* Nav items */}
+        <nav className="sidebar-nav">
+          {NAV_ITEMS.map(({ to, label, Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              onClick={onClose}
+              className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+            >
+              <Icon size={16} className="nav-icon" />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Footer */}
+        <div className="sidebar-footer">
+          <div className="user-card">
+            <div className="user-avatar" style={{ background: user?.photo ? 'transparent' : undefined, overflow: 'hidden', padding: 0 }}>
+            {user?.photo
+              ? <img src={user.photo} alt={user?.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              : initials}
+          </div>
+            <div className="user-info-text">
+              <strong>{user?.full_name}</strong>
+              <small>{user?.role}</small>
+            </div>
+            <button
+              className="icon-btn"
+              onClick={handleLogout}
+              title="Sign Out"
+              style={{ width: 28, height: 28, flexShrink: 0 }}
+            >
+              <LogOut size={13} />
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }

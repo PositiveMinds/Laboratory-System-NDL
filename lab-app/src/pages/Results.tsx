@@ -3,10 +3,10 @@ import { useMinLoading } from '../hooks/useMinLoading';
 import { flushSync } from 'react-dom';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { FlaskConical, Printer, CheckCheck, ExternalLink, Mail, TrendingUp, X, Search } from 'lucide-react';
-import { getOrders, getOrder, updateResult, markResultsComplete, getResultsReport, getAutofillForTest, getResultHistory, getLogo } from '../lib/api';
+import { getOrders, getOrder, updateResult, markResultsComplete, getResultsReport, getAutofillForTest, getResultHistory, getLogo, getLabInfo, getErrorMessage } from '../lib/api';
 import { triggerPrint } from '../lib/print';
 import { sendResultsEmail, isEmailConfigured } from '../lib/email';
-import type { OrderSummary, OrderDetail, ResultsReportData, ResultHistory } from '../types';
+import type { OrderSummary, OrderDetail, ResultsReportData, ResultHistory, LabInfo } from '../types';
 import PrintResults from '../components/PrintResults';
 import { useAssets } from '../contexts/AssetsContext';
 import EZSelect from '../components/EZSelect';
@@ -44,6 +44,7 @@ export default function Results() {
   const [loadingDetail, setLoadingDetail] = useMinLoading(false);
   const [saving, setSaving] = useState(false);
   const [reportData, setReportData] = useState<ResultsReportData | null>(null);
+  const [labInfo, setLabInfo] = useState<LabInfo | null>(null);
   const { logo, setLogo } = useAssets();
   const [orderPage, setOrderPage] = useState(1);
   const [orderSearch, setOrderSearch] = useState('');
@@ -58,6 +59,8 @@ export default function Results() {
   }, []);
 
   useEffect(() => { loadOrders(); }, [loadOrders]);
+
+  useEffect(() => { getLabInfo().then(setLabInfo).catch(() => {}); }, []);
 
   const filteredOrders = useMemo(() => {
     if (!orderSearch.trim()) return orders;
@@ -148,7 +151,7 @@ export default function Results() {
         Swal.fire({ icon: 'success', title: 'Results Saved', timer: 2000, showConfirmButton: false });
       }
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setSaving(false);
     }
@@ -182,7 +185,7 @@ export default function Results() {
       await Promise.all([selectOrder(selectedOrder.id), loadOrders()]);
       Swal.fire({ icon: 'success', title: 'Order Completed', timer: 2000, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -213,7 +216,7 @@ export default function Results() {
       await sendResultsEmail(data, toEmail, freshLogo);
       Swal.fire({ icon: 'success', title: 'Email Sent', text: `Results sent to ${toEmail}`, timer: 2500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Failed to Send', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Failed to Send', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setSaving(false);
     }
@@ -238,10 +241,12 @@ export default function Results() {
       const [data, freshLogo] = await Promise.all([getResultsReport(selectedOrder.id), getLogo().catch(() => null)]);
       if (freshLogo && freshLogo !== logo) setLogo(freshLogo);
       flushSync(() => setReportData(data));
-      triggerPrint();
-      window.addEventListener('afterprint', () => setReportData(null), { once: true });
+      setTimeout(() => {
+        triggerPrint();
+        window.addEventListener('afterprint', () => setReportData(null), { once: true });
+      }, 300);
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setSaving(false);
     }
@@ -258,7 +263,7 @@ export default function Results() {
 
   return (
     <div>
-      {reportData && <div className="print-container"><PrintResults data={reportData} logo={logo} /></div>}
+      {reportData && <div className="print-container"><PrintResults data={reportData} logo={logo} labInfo={labInfo} /></div>}
 
       <div className="no-print">
         <div className="page-header">

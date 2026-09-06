@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Component, ReactNode } from 'react';
+import { Component, ReactNode, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { checkForUpdates } from './lib/updater';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null };
@@ -50,6 +51,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    const timer = setTimeout(() => { checkForUpdates(true); }, 3000);
+    return () => clearTimeout(timer);
+  }, [user]);
+
   if (loading) {
     return (
       <div className="loading-overlay" style={{ minHeight: '100vh' }}>

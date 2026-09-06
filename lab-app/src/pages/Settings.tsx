@@ -20,7 +20,7 @@ import { fmtUGX } from '../lib/currency';
 import { Lock, Unlock, Plus, Trash2, Pencil, Database, Save, Image, FolderOpen } from 'lucide-react';
 import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
 import ImageUpload from '../components/ImageUpload';
-import { saveLogo, deleteLogo, saveProfilePhoto } from '../lib/api';
+import { saveLogo, deleteLogo, saveProfilePhoto, getErrorMessage } from '../lib/api';
 import { useAssets } from '../contexts/AssetsContext';
 
 export default function Settings() {
@@ -178,7 +178,7 @@ export default function Settings() {
       setPendingLogo(undefined);
       Swal.fire({ icon: 'success', title: 'Logo Saved', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setLogoSaving(false);
     }
@@ -193,7 +193,7 @@ export default function Settings() {
       setPendingPhoto(undefined);
       Swal.fire({ icon: 'success', title: 'Photo Saved', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setPhotoSaving(false);
     }
@@ -209,7 +209,7 @@ export default function Settings() {
       setUser(updated);
       Swal.fire({ icon: 'success', title: 'Profile Updated', timer: 2000, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setProfileSaving(false);
     }
@@ -231,7 +231,7 @@ export default function Settings() {
       setOldPw(''); setNewPw(''); setConfirmPw('');
       Swal.fire({ icon: 'success', title: 'Password Changed', timer: 2000, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setPwSaving(false);
     }
@@ -255,7 +255,7 @@ export default function Settings() {
       setUserForm({ username: '', full_name: '', email: '', password: '', role: 'lab_tech' });
       Swal.fire({ icon: 'success', title: 'User Created', timer: 2000, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setUserSaving(false);
     }
@@ -273,7 +273,7 @@ export default function Settings() {
       setUsers(us => us.filter(u => u.id !== uid));
       Swal.fire({ icon: 'success', title: 'Deleted', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -283,7 +283,7 @@ export default function Settings() {
       setUsers(us => us.map(u => u.id === uid ? { ...u, failed_attempts: 0, locked_until: undefined } : u));
       Swal.fire({ icon: 'success', title: `${uname} unlocked`, timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -302,7 +302,7 @@ export default function Settings() {
       setUsers(us => us.map(u => u.id === uid ? { ...u, email: email || undefined } : u));
       Swal.fire({ icon: 'success', title: 'Email Updated', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -350,7 +350,7 @@ export default function Settings() {
       await loadRangesForTest(Number(selectedRefTestId));
       Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setRangeSaving(false);
     }
@@ -363,7 +363,7 @@ export default function Settings() {
       await deleteReferenceRange(r.id);
       setRefRanges(rs => rs.filter(x => x.id !== r.id));
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -396,7 +396,7 @@ export default function Settings() {
         confirmButtonColor: '#78001d',
       });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Backup Failed', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Backup Failed', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setBackingUp(false);
     }
@@ -427,7 +427,7 @@ export default function Settings() {
           confirmButtonColor: '#78001d',
         });
       } catch (err) {
-        Swal.fire({ icon: 'error', title: 'Restore Failed', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+        Swal.fire({ icon: 'error', title: 'Restore Failed', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
       } finally {
         setRestoring(false);
       }
@@ -446,7 +446,7 @@ export default function Settings() {
       setTests(ts => ts.map(t => t.id === testId ? { ...t, price } : t));
       Swal.fire({ icon: 'success', title: 'Price Updated', timer: 1200, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setPriceSaving(null);
     }
@@ -463,7 +463,7 @@ export default function Settings() {
       setTests(ts => ts.map(t => ({ ...t, price: parseInt(editPrices[t.id]) ?? t.price })));
       Swal.fire({ icon: 'success', title: `${changed.length} Price(s) Updated`, timer: 1800, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setPriceSaving(null);
     }
@@ -484,7 +484,7 @@ export default function Settings() {
       setCategories(cs => [...cs, cat]);
       Swal.fire({ icon: 'success', title: 'Category Added', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -504,7 +504,7 @@ export default function Settings() {
       setTests(ts => ts.map(t => t.category_id === catId ? { ...t, category_name: name.trim() } : t));
       Swal.fire({ icon: 'success', title: 'Category Renamed', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -519,7 +519,7 @@ export default function Settings() {
       setCategories(cs => cs.filter(c => c.id !== catId));
       Swal.fire({ icon: 'success', title: 'Category Deleted', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -548,7 +548,7 @@ export default function Settings() {
       setEditPrices(p => ({ ...p, [newTest.id]: newTest.price.toString() }));
       Swal.fire({ icon: 'success', title: 'Test Added', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -564,7 +564,7 @@ export default function Settings() {
       setTests(ts => ts.filter(t => t.id !== testId));
       Swal.fire({ icon: 'success', title: 'Test Deleted', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     }
   };
 
@@ -574,7 +574,7 @@ export default function Settings() {
       await saveLabInfo({ name: labName.trim(), tagline: labTagline.trim(), address: labAddress.trim(), phone: labPhone.trim(), email: labEmail.trim(), website: labWebsite.trim() });
       Swal.fire({ icon: 'success', title: 'Lab Info Saved', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setLabInfoSaving(false);
     }
@@ -598,7 +598,7 @@ export default function Settings() {
       setSmtpPass('');
       Swal.fire({ icon: 'success', title: 'SMTP Config Saved', timer: 1500, showConfirmButton: false });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setSmtpLoading(false);
     }
@@ -617,7 +617,7 @@ export default function Settings() {
       );
       Swal.fire({ icon: 'success', title: 'Test Email Sent', text: `Check ${smtpTestEmail}`, confirmButtonColor: '#78001d' });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Send Failed', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Send Failed', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setSmtpTesting(false);
     }

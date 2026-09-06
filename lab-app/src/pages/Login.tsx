@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Moon, Sun, Loader2, Shield, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { login, requestPasswordReset, resetPassword } from '../lib/api';
+import { login, requestPasswordReset, resetPassword, getErrorMessage } from '../lib/api';
 import Swal from 'sweetalert2';
 import { sendOTPEmail } from '../lib/email';
 
@@ -39,7 +39,7 @@ export default function Login() {
       setUser(user);
       navigate('/dashboard');
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Login Failed', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Login Failed', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setLoading(false);
     }
@@ -78,7 +78,7 @@ export default function Login() {
       }
       setStep('forgot-reset');
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setLoading(false);
     }
@@ -96,7 +96,7 @@ export default function Login() {
       setStep('login');
       setFpIdentifier(''); setFpToken(''); setFpNewPw(''); setFpConfirmPw(''); setPendingToken('');
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', confirmButtonColor: '#78001d' });
+      Swal.fire({ icon: 'error', title: 'Error', text: getErrorMessage(err), confirmButtonColor: '#78001d' });
     } finally {
       setLoading(false);
     }

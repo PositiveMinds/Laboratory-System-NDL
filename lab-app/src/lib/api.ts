@@ -1,4 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
+
+// Tauri command rejections resolve as the raw String from the Rust `Err`,
+// not a JS Error, so `err instanceof Error` is always false for them.
+export const getErrorMessage = (err: unknown): string => {
+  if (typeof err === 'string' && err.trim()) return err;
+  if (err instanceof Error && err.message) return err.message;
+  return 'Something went wrong. Please try again.';
+};
 import type {
   SessionUser, Patient, TestCategory, TestItem, OrderSummary, OrderDetail,
   Payment, ReceiptData, ResultsReportData, DashboardStats, UserInfo,
