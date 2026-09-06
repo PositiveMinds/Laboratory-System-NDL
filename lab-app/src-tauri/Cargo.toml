@@ -1,6 +1,6 @@
 [package]
 name = "lab-app"
-version = "1.0.0"
+version = "1.0.2"
 description = "NDL Laboratory Management System"
 authors = []
 edition = "2021"

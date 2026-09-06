@@ -1,6 +1,7 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FlaskConical, Mail, Phone, ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react';
+import { getVersion } from '@tauri-apps/api/app';
 import { useAssets } from '../contexts/AssetsContext';
 import { checkForUpdates } from '../lib/updater';
 
@@ -16,7 +17,6 @@ const DEVELOPER = {
 
 const SYSTEM = {
   name: 'NDL Lab Management System',
-  version: '1.0.0',
   build: '2026',
   description: 'A full-featured desktop Laboratory Information Management System (LIMS) built for Noble Diagnostic Laboratory, Entebbe, Uganda.',
 };
@@ -93,6 +93,9 @@ export default function About() {
   const navigate = useNavigate();
   const { logo } = useAssets(); // uploaded logo from Settings → Branding
   const [checking, setChecking] = useState(false);
+  const [appVersion, setAppVersion] = useState('…');
+
+  useEffect(() => { getVersion().then(setAppVersion).catch(() => {}); }, []);
 
   const handleCheckUpdates = async () => {
     setChecking(true);
@@ -155,7 +158,7 @@ export default function About() {
             </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {[
-                ['Version', SYSTEM.version],
+                ['Version', appVersion],
                 ['Build Year', SYSTEM.build],
                 ['Platform', 'Windows (Desktop)'],
               ].map(([k, v]) => (
@@ -289,7 +292,7 @@ export default function About() {
         </p>
         <p style={{ fontSize: 11, color: 'var(--on-surface-variant)', opacity: 0.7, margin: 0 }}>
           © {SYSTEM.build} {DEVELOPER.company}. All rights reserved.
-          &nbsp;·&nbsp; NDL Lab v{SYSTEM.version}
+          &nbsp;·&nbsp; NDL Lab v{appVersion}
         </p>
       </div>
     </div>

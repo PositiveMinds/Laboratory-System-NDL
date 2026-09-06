@@ -31,7 +31,7 @@
 
   header.nav {
     position: sticky; top: 0; z-index: 20;
-    background: rgba(251,247,247,0.9);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--outline);
   }
@@ -137,8 +137,6 @@
   .dl-card .btn-primary { background: #fff; color: var(--primary); box-shadow: none; }
   .dl-card .btn-primary:hover { background: #f5e6e6; }
   .dl-side { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
-  .dl-fallback { font-size: 12px; color: rgba(255,255,255,0.75); }
-  .dl-fallback a { text-decoration: underline; color: #fff; }
 
   footer { border-top: 1px solid var(--outline); padding: 32px 0; }
   .foot-inner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
@@ -184,7 +182,7 @@
     <h1 class="headline">Laboratory management,<br><em>without the paperwork.</em></h1>
     <p class="sub">NDL Lab System is a desktop LIMS for patient records, test orders, results, billing and reporting — built specifically for Noble Diagnostic Laboratory.</p>
     <div class="cta-row">
-      <a id="dl-primary-btn" class="btn btn-primary" href="https://github.com/PositiveMinds/Laboratory-System-NDL/releases/latest" target="_blank" rel="noopener">
+      <a id="dl-primary-btn" class="btn btn-primary" href="#download">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         <span id="dl-primary-label">Download for Windows</span>
       </a>
@@ -241,11 +239,10 @@
         <p id="dl-desc">Free installer for Windows. Signed and verified — future updates install themselves from inside the app.</p>
       </div>
       <div class="dl-side">
-        <a id="dl-secondary-btn" class="btn btn-primary" href="https://github.com/PositiveMinds/Laboratory-System-NDL/releases/latest" target="_blank" rel="noopener">
+        <a id="dl-secondary-btn" class="btn btn-primary" href="#download">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span id="dl-secondary-label">Download Installer</span>
         </a>
-        <span class="dl-fallback">or <a href="https://github.com/PositiveMinds/Laboratory-System-NDL/releases" target="_blank" rel="noopener">view all releases on GitHub</a></span>
       </div>
     </div>
   </section>
